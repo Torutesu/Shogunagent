@@ -7,13 +7,13 @@
   "mcp_url": "https://api.shogunagent.com/mcp",
   "repo": "https://github.com/Torutesu/Shogunagent",
   "license": "Apache-2.0",
-  "status_line": "Pre-release. The engine is migrated and builds on Linux; the hosted endpoints below ship in Phase 1 and are not live yet.",
-  "tagline": "The state layer for AI agents.",
+  "status_line": "Linux developer preview v0.1.0 is available. Hosted access and npm/PyPI packages are not published.",
+  "tagline": "Give your agents a shared picture of your work.",
   "motto": "Memory remembers. State knows.",
-  "one_sentence": "Calibrated truth about a person's work (people, projects, commitments, open loops) with provenance on every fact and a human gate on every send, shared across all their agents.",
-  "developer_30s": "Your agents start every session from zero and act without asking. ShogunAgent gives them one typed, provenance-backed model of the user's work over MCP, enforces three permission tiers on every action, keeps data on the device by default, and exports everything in an open format. Reads are free; you pay for what you ingest and run.",
-  "not_a_memory_api": "It is not a memory API. Agent memory is a saturated category and the labs ship personalization memory for free. ShogunAgent names a different thing: not what an agent remembers, but what is true now.",
-  "setup_prompt": "Set up ShogunAgent in this project. Read https://shogunagent.com/llms.txt and follow it. Reads are L1 and free; anything that sends, posts or pays is L3 and needs human approval, so never try to bypass an approval URL.",
+  "one_sentence": "Carry context between tasks and agents: people, projects and unfinished commitments, with source evidence and human approval before external actions.",
+  "developer_30s": "Give agents shared context about the user’s work, with typed commitments and open loops, evidence and confidence. Start with a local Linux preview, verify authenticated ingestion and recall, then connect a client using the source CLI guide.",
+  "not_a_memory_api": "ShogunAgent focuses on work state: who owes what, what remains open, and which evidence supports it. Evaluate it against your own tasks; this preview does not establish superiority over another memory system.",
+  "setup_prompt": "Read https://shogunagent.com/llms.txt and /index.md. Check for an existing ShogunAgent connection first. Otherwise follow the Linux v0.1.0 preview setup; npm/PyPI and hosted access are not published. Explain platform requirements and ask before running commands. Never display store keys or tokens. Ingestion stores source events; extraction into state is separate. The CLI MCP entry is read-only. L3 external actions always require human approval.",
   "works_with": [
     "Claude Code",
     "Codex",
@@ -46,8 +46,8 @@
   "pillars": [
     {
       "title": "Typed state, not text memory",
-      "claim": "Every fact is a typed row with a verbatim quote from its source event and a confidence score. Newer facts supersede older ones, contradictions are explicit, confidence decays over time.",
-      "proof": "Writes with empty state_provenance are rejected at the repository layer. High / Medium / Low bands are enforced in one place (shogun-fusion/confidence.rs). The loop consolidator stores nothing without an exact quote match and confidence ≥ 0.84."
+      "claim": "Typed people, projects, commitments and open loops retain source links and confidence. Evidence-backed updates can revise state; historical imports may lack an exact quote and should not be presented as newly verified facts.",
+      "proof": "The repository enforces provenance links and confidence bands. Validated extraction checks quotes; older provenance rows can have no recorded quote."
     },
     {
       "title": "Permission tiers on every action",
@@ -56,8 +56,8 @@
     },
     {
       "title": "Local-first, open, portable",
-      "claim": "Data stays on the device by default. The cloud path retains no bodies. The engine is open source. State exports in an open format.",
-      "proof": "Zero-retention relay: the traceability log has no body column. Secret redaction: recall 1.0, 0 false positives. User-held keys. Apache-2.0."
+      "claim": "Run the open-source engine locally with an encrypted store per principal. Model-backed extraction is separate and may send text to the provider you configure.",
+      "proof": "Apache-2.0 engine, portable exports, explicit model configuration. This first-success example uses synthetic text and makes no model calls."
     }
   ],
   "tiers": [
@@ -115,33 +115,78 @@
     ]
   },
   "faces": {
-    "intro": "Three faces, one behavior. Every capability is exposed over MCP, REST and CLI with the same permission level and the same result.",
-    "mcp": "{\"jsonrpc\":\"2.0\",\"id\":1,\n \"method\":\"tools/call\",\n \"params\":{\"name\":\"state.open_loops.list\",\n           \"arguments\":{\"person\":\"Sam\",\"limit\":5}}}",
-    "rest": "curl -s https://api.shogunagent.com/v1/state/open_loops \\\n  -H \"Authorization: Bearer $SHOGUNAGENT_KEY\" \\\n  --data-urlencode person=Sam --data-urlencode limit=5 -G",
-    "cli": "shogunagent state open-loops --person Sam --limit 5 --json",
-    "response": "{\n  \"result\": [{\n    \"id\": \"loop_7f3\",\n    \"summary\": \"Send Sam the revised budget\",\n    \"owner\": \"you\", \"with\": \"Sam\",\n    \"since\": \"2026-10-21\",\n    \"confidence\": 0.91, \"band\": \"high\",\n    \"evidence\": [{ \"event\": \"evt_a91\", \"quote\": \"I'll get you the revised budget by Thursday\" }]\n  }],\n  \"usage\": { \"unit\": \"reads\", \"quantity\": 1, \"cost_micro_usd\": 0 },\n  \"latency_ms\": 41,\n  \"hints\": [],\n  \"next_action\": null\n}",
+    "intro": "Three interfaces to the same local store. The examples below assume the authenticated preview is running and its token is available securely. MCP client setup is a separate step. Response examples are abbreviated; stored source evidence is not extracted state.",
+    "mcp": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"memory.recall\",\n    \"arguments\": {\n      \"query\": \"Kestrel\",\n      \"budget_tokens\": 1000\n    }\n  }\n}",
+    "rest": "curl --fail-with-body --silent --show-error http://127.0.0.1:7464/v1/memory/recall \\\n  -H \"Authorization: Bearer $SHOGUN_PREVIEW_TOKEN\" \\\n  -H 'Content-Type: application/json' \\\n  --data '{\"query\":\"Kestrel\",\"budget_tokens\":1000}'",
+    "cli": "SHOGUN_API_PORT=7464 SHOGUN_API_TOKEN=\"$SHOGUN_PREVIEW_TOKEN\" \\\n  \"$SHOGUN_PREVIEW_DIR/bin/shogun\" recall Kestrel --budget-tokens 1000",
+    "response": "{\n  \"result\": {\n    \"items\": [],\n    \"evidence\": [\n      {\n        \"event_id\": 1,\n        \"source\": \"agent\",\n        \"excerpt\": \"The Kestrel demo codeword is violet.\"\n      }\n    ]\n  },\n  \"usage\": {\n    \"unit\": \"reads\",\n    \"quantity\": 1,\n    \"cost_micro_usd\": 0\n  }\n}",
     "payment_required": "HTTP/1.1 402 Payment Required\n\n{\n  \"error\": { \"code\": \"payment_required\", \"next_action\": \"top_up\" },\n  \"payment\": {\n    \"amount_micro_usd\": 6000,\n    \"unit\": \"events\",\n    \"accepts\": [{ \"rail\": \"card\", \"url\": \"https://api.shogunagent.com/topup?k=…\" }],\n    \"retry_after\": 0\n  }\n}",
     "l3": "{\n  \"resultType\": \"input_required\",\n  \"level\": \"L3\",\n  \"approval_url\": \"https://api.shogunagent.com/approve/act_31c\",\n  \"expires_in_s\": 900,\n  \"usage\": { \"unit\": \"actions\", \"quantity\": 0, \"cost_micro_usd\": 0 },\n  \"next_action\": \"approve_at_url\"\n}"
   },
   "pricing": {
-    "line": "Reads are free. You pay for what you ingest and what you run. No subscription, prepaid credits, 402 when exhausted, per-key and per-agent hard caps from day one.",
-    "disclaimer": "All prices are estimates and will be revised from design partners' real usage. Failed and empty results cost nothing. Delete and export are always free.",
+    "line": "The local engine is free open-source software. Your infrastructure and model usage are separate. Hosted access and checkout are not available here.",
+    "disclaimer": "Hosted prices below are planning estimates, not a purchasable offer. No signup, checkout or payment is activated by this page.",
     "rows": [
-      { "item": "State reads (state.*, get_context_pack, recall, search)", "price": "$0", "note": "Metered for observability, never billed" },
-      { "item": "Remote L2/L3 approvals", "price": "$0", "note": "" },
-      { "item": "Local (open source)", "price": "$0", "note": "Same API; switch baseURL" },
-      { "item": "Ingest", "price": "$0.50 / 1K events", "note": "Includes extraction LLM cost" },
-      { "item": "Model-invoking op", "price": "$0.10 / 1K", "note": "Consolidation, AI search, entity pages" },
-      { "item": "Tool run, first-party connector", "price": "$0.002 / call", "note": "Writes pass L2/L3 at the same price" },
-      { "item": "Tool run, third-party provider", "price": "provider price + 5%", "note": "Failures and empty results $0" },
-      { "item": "Hosted storage", "price": "$0.10 / GB-month", "note": "Delete and export always free" },
-      { "item": "Enterprise", "price": "same rates, 10–25% off with annual commit", "note": "BYOC / ZDR / SSO / audit included; no seat fees" }
+      {
+        "item": "State reads (state.*, get_context_pack, recall, search)",
+        "price": "$0",
+        "note": "Metered for observability, never billed"
+      },
+      {
+        "item": "Remote L2/L3 approvals",
+        "price": "$0",
+        "note": ""
+      },
+      {
+        "item": "Local (open source)",
+        "price": "$0",
+        "note": "Your infrastructure and model costs are separate"
+      },
+      {
+        "item": "Ingest",
+        "price": "$0.50 / 1K events",
+        "note": "Includes extraction LLM cost"
+      },
+      {
+        "item": "Model-invoking op",
+        "price": "$0.10 / 1K",
+        "note": "Consolidation, AI search, entity pages"
+      },
+      {
+        "item": "Tool run, first-party connector",
+        "price": "$0.002 / call",
+        "note": "Writes pass L2/L3 at the same price"
+      },
+      {
+        "item": "Tool run, third-party provider",
+        "price": "provider price + 5%",
+        "note": "Failures and empty results $0"
+      },
+      {
+        "item": "Hosted storage",
+        "price": "$0.10 / GB-month",
+        "note": "Delete and export always free"
+      },
+      {
+        "item": "Enterprise",
+        "price": "same rates, 10–25% off with annual commit",
+        "note": "BYOC / ZDR / SSO / audit included; no seat fees"
+      }
     ]
   },
   "deploy": [
-    { "title": "On your laptop", "body": "The open-source engine, MCP / REST / CLI on loopback, one SQLCipher file per principal. $0. Nothing leaves the device." },
-    { "title": "Hosted", "body": "The same API behind api.shogunagent.com. Sync a second device or agent, top up a wallet, approve L3 actions from the web or Slack. Bodies are relayed, never stored." },
-    { "title": "In your cloud", "body": "BYOC, zero data retention, SSO / SCIM, audit export. Same rates, no seat fees." }
+    {
+      "title": "Local Linux preview",
+      "body": "Published x64 and ARM64 binaries, an encrypted local store, and authenticated REST/MCP. The sample uses no external model. Other operating systems need a separately supported source or app setup."
+    },
+    {
+      "title": "Hosted",
+      "body": "Hosted access is not publicly available. Do not treat example API URLs as a running service or send them credentials."
+    },
+    {
+      "title": "In your cloud",
+      "body": "Deployment configuration exists in source. Production operation, provider credentials and infrastructure require a separate operator setup."
+    }
   ],
   "open_source": {
     "open": "The engine (state tables, confidence, consolidator, Dream Cycle), local MCP / REST / CLI, connector definitions and the router engine, SKILL.md, the export format, all six eval harnesses.",
@@ -149,33 +194,159 @@
     "telemetry": "No telemetry by default. Opt-in only, counts only, never content."
   },
   "comparison": {
-    "intro": "Memory APIs (Mem0, Zep, Letta, supermemory, Cognee) store free text in a vendor cloud and expose read/write. Routers and registries have no permission tiers and no state. ShogunAgent is the system of record underneath both.",
+    "intro": "Compare the current versions against your workload. Other systems also offer structured memory, local or enterprise deployment and temporal retrieval; this page does not establish exclusive capabilities or measured superiority.",
     "rows": [
-      { "axis": "Unit of storage", "memory": "Free-text facts, embeddings", "shogun": "Typed rows with quote, confidence and supersession" },
-      { "axis": "Permission model", "memory": "Read / write", "shogun": "L1 / L2 / L3 by action type, same for every agent" },
-      { "axis": "Where data lives", "memory": "Vendor cloud", "shogun": "The device by default; hosted path keeps no bodies" },
-      { "axis": "Engine", "memory": "Closed; clients open at best", "shogun": "Apache-2.0" },
-      { "axis": "Leaving", "memory": "Export varies", "shogun": "Open export format; delete and export free" },
-      { "axis": "Reads", "memory": "Billed", "shogun": "Free" }
+      {
+        "axis": "Unit of storage",
+        "memory": "Varies by product and deployment; verify current documentation",
+        "shogun": "Typed rows with quote, confidence and supersession"
+      },
+      {
+        "axis": "Permission model",
+        "memory": "Varies by product and deployment; verify current documentation",
+        "shogun": "L1 / L2 / L3 by action type, same for every agent"
+      },
+      {
+        "axis": "Where data lives",
+        "memory": "Varies by product and deployment; verify current documentation",
+        "shogun": "The device by default; hosted path keeps no bodies"
+      },
+      {
+        "axis": "Engine",
+        "memory": "Varies by product and deployment; verify current documentation",
+        "shogun": "Apache-2.0"
+      },
+      {
+        "axis": "Leaving",
+        "memory": "Varies by product and deployment; verify current documentation",
+        "shogun": "Open export format; delete and export free"
+      },
+      {
+        "axis": "Reads",
+        "memory": "Varies by product and deployment; verify current documentation",
+        "shogun": "Free"
+      }
     ]
   },
   "faq": [
-    { "q": "Is this a memory API?", "a": "No. Memory APIs answer \"what did the agent see\". ShogunAgent answers \"what is true now\": who owes whom what, which loops are open, with a quote behind every row. It can sit behind Anthropic's memory tool as storage, and it ingests from Mem0-style free text, but the product is the typed state." },
-      { "q": "Can an agent start without a human?", "a": "Yes. discover, inspect and a tightly scoped read need no key. POST /v1/agents returns a scoped key and the free allowance with no email. The first metered call returns 402 with everything needed to proceed. The only human step is attaching a card, once." },
-    { "q": "What can an agent never do?", "a": "Send, post, pay or create calendar events without a human approving at a URL. That is L3 by type, and the router denies any operation that is not in its scope table." },
-    { "q": "Which model does it use?", "a": "It is model-agnostic. Our own LLM use is extraction and consolidation only, in cheap batch lanes. Your agents bring their own model." },
-    { "q": "Where is it today?", "a": "Pre-release. About 330k lines of Rust migrated from ShogunAI build and test on Linux. Phase 1 (Streamable HTTP MCP with the frozen core tools, API-key auth, /memories projection, export v1, router skeleton, 402 and the agent-readable surfaces) is in progress. Watch the repo." }
+    {
+      "q": "Is this a memory API?",
+      "a": "ShogunAgent focuses on evidence-backed work state and open commitments. It also stores source events and retrieves context. Inspect the confidence and evidence of each result; historical imported links may not include an exact quote."
+    },
+    {
+      "q": "Can an agent start without a human?",
+      "a": "Use an existing authorized connection, or have the user set up the local preview. Reads require authentication even when free. The source CLI’s MCP entry is read-only; ingestion uses authenticated HTTP. Hosted registration is not available here."
+    },
+    {
+      "q": "What can an agent never do?",
+      "a": "Send, post, pay or create calendar events without a human approving at a URL. That is L3 by type, and the router denies any operation that is not in its scope table."
+    },
+    {
+      "q": "Which model does it use?",
+      "a": "Your agent chooses its model. Extraction and consolidation need their own configured provider. The preview below only stores and recalls synthetic source text; it does not run a model or claim extracted state is ready."
+    },
+    {
+      "q": "Where is it today?",
+      "a": "Linux v0.1.0 binaries are published on GitHub. The npm CLI and npm/PyPI SDKs remain unpublished, hosted access is not public, and actual coding-client compatibility still needs validation. The source and local protocol tests are available for inspection."
+    }
   ],
   "nav": [
-    { "id": "agents", "label": "For agents" },
-    { "id": "what", "label": "What it is" },
-    { "id": "faces", "label": "Three faces" },
-    { "id": "tiers", "label": "Permission tiers" },
-    { "id": "tools", "label": "Tools" },
-    { "id": "pricing", "label": "Pricing" },
-    { "id": "deploy", "label": "Runs everywhere" },
-    { "id": "compare", "label": "Not a memory API" },
-    { "id": "open", "label": "Open source" },
-    { "id": "faq", "label": "FAQ" }
-  ]
+    {
+      "id": "setup",
+      "label": "Get started"
+    },
+    {
+      "id": "agents",
+      "label": "For agents"
+    },
+    {
+      "id": "what",
+      "label": "What it is"
+    },
+    {
+      "id": "faces",
+      "label": "Three faces"
+    },
+    {
+      "id": "tiers",
+      "label": "Permission tiers"
+    },
+    {
+      "id": "tools",
+      "label": "Tools"
+    },
+    {
+      "id": "pricing",
+      "label": "Pricing"
+    },
+    {
+      "id": "deploy",
+      "label": "Runs everywhere"
+    },
+    {
+      "id": "compare",
+      "label": "Not a memory API"
+    },
+    {
+      "id": "open",
+      "label": "Open source"
+    },
+    {
+      "id": "faq",
+      "label": "FAQ"
+    }
+  ],
+  "setup": {
+    "version": "v0.1.0",
+    "release_url": "https://github.com/Torutesu/Shogunagent/releases/tag/v0.1.0",
+    "docs_url": "https://github.com/Torutesu/Shogunagent/blob/v0.1.0/packages/cli/README.md",
+    "platforms": [
+      {
+        "id": "x64",
+        "label": "Linux x64",
+        "archive": "https://github.com/Torutesu/Shogunagent/releases/download/v0.1.0/shogunagent-v0.1.0-x86_64-unknown-linux-gnu.tar.gz",
+        "checksum": "https://github.com/Torutesu/Shogunagent/releases/download/v0.1.0/shogunagent-v0.1.0-x86_64-unknown-linux-gnu.tar.gz.sha256",
+        "sha256": "51fa1bad5dba9fde5fca50afd5aeaf35fe1eaab2e16dfe4ece70ca909ec6a24a",
+        "command": "export SHOGUN_PREVIEW_DIR=\"${SHOGUN_PREVIEW_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/shogunagent-preview-v0.1.0}\"\n(\n  set -eu\n  umask 077\n  mkdir -p \"$(dirname \"$SHOGUN_PREVIEW_DIR\")\"\n  mkdir \"$SHOGUN_PREVIEW_DIR\" # Refuse an existing directory; never overwrite a store/key.\n  cd \"$SHOGUN_PREVIEW_DIR\"\n  curl --fail --location --output 'shogunagent-v0.1.0-x86_64-unknown-linux-gnu.tar.gz' 'https://github.com/Torutesu/Shogunagent/releases/download/v0.1.0/shogunagent-v0.1.0-x86_64-unknown-linux-gnu.tar.gz'\n  printf '%s  %s\\n' '51fa1bad5dba9fde5fca50afd5aeaf35fe1eaab2e16dfe4ece70ca909ec6a24a' 'shogunagent-v0.1.0-x86_64-unknown-linux-gnu.tar.gz' | sha256sum --check -\n  mkdir bin\n  tar -xzf 'shogunagent-v0.1.0-x86_64-unknown-linux-gnu.tar.gz' --strip-components=1 -C bin\n  python3 - <<'PY'\nimport os, secrets\nfor name, size in [('db.key', 32), ('api.token', 24)]:\n    fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)\n    with os.fdopen(fd, 'w') as out:\n        out.write(secrets.token_hex(size) + '\\n')\nPY\n)"
+      },
+      {
+        "id": "arm64",
+        "label": "Linux ARM64",
+        "archive": "https://github.com/Torutesu/Shogunagent/releases/download/v0.1.0/shogunagent-v0.1.0-aarch64-unknown-linux-gnu.tar.gz",
+        "checksum": "https://github.com/Torutesu/Shogunagent/releases/download/v0.1.0/shogunagent-v0.1.0-aarch64-unknown-linux-gnu.tar.gz.sha256",
+        "sha256": "dcb0e798bab6c72a744f51c25ef9e9ab30d98ff76dac9ad2dbcbb4dc0f5ebe73",
+        "command": "export SHOGUN_PREVIEW_DIR=\"${SHOGUN_PREVIEW_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/shogunagent-preview-v0.1.0}\"\n(\n  set -eu\n  umask 077\n  mkdir -p \"$(dirname \"$SHOGUN_PREVIEW_DIR\")\"\n  mkdir \"$SHOGUN_PREVIEW_DIR\" # Refuse an existing directory; never overwrite a store/key.\n  cd \"$SHOGUN_PREVIEW_DIR\"\n  curl --fail --location --output 'shogunagent-v0.1.0-aarch64-unknown-linux-gnu.tar.gz' 'https://github.com/Torutesu/Shogunagent/releases/download/v0.1.0/shogunagent-v0.1.0-aarch64-unknown-linux-gnu.tar.gz'\n  printf '%s  %s\\n' 'dcb0e798bab6c72a744f51c25ef9e9ab30d98ff76dac9ad2dbcbb4dc0f5ebe73' 'shogunagent-v0.1.0-aarch64-unknown-linux-gnu.tar.gz' | sha256sum --check -\n  mkdir bin\n  tar -xzf 'shogunagent-v0.1.0-aarch64-unknown-linux-gnu.tar.gz' --strip-components=1 -C bin\n  python3 - <<'PY'\nimport os, secrets\nfor name, size in [('db.key', 32), ('api.token', 24)]:\n    fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)\n    with os.fdopen(fd, 'w') as out:\n        out.write(secrets.token_hex(size) + '\\n')\nPY\n)"
+      }
+    ],
+    "requirements": "Linux x64 or ARM64 with glibc 2.39 or newer (for example Ubuntu 24.04), curl, tar, sha256sum and Python 3. Check uname -m and ldd --version before choosing. ARM64 downloads were checksum/architecture checked; the runtime smoke ran on x64.",
+    "unsupported": "No macOS or Windows binaries are published. macOS users may use an existing authorized ShogunAI app connection or investigate a source build; Windows source operation is not validated here. Do not run these Linux archives on either OS.",
+    "steps": [
+      {
+        "title": "2. Start the local preview",
+        "description": "Keep this terminal running. On first authenticated access, --multi provisions an encrypted principal store. The env key provider is for evaluation, not production. Stop with Ctrl-C; restart with the same directory and keys. Never share, print or replace db.key or api.token.",
+        "command": "export SHOGUN_PREVIEW_DIR=\"${SHOGUN_PREVIEW_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/shogunagent-preview-v0.1.0}\"\n(\n  set -eu\n  export SHOGUN_DB_KEY_PREVIEW=\"$(cat \"$SHOGUN_PREVIEW_DIR/db.key\")\"\n  export SHOGUN_PRINCIPAL_TOKENS=\"preview:$(cat \"$SHOGUN_PREVIEW_DIR/api.token\"):website-preview\"\n  export SHOGUN_API_PORT=7464\n  \"$SHOGUN_PREVIEW_DIR/bin/shogun-api\" --multi \"$SHOGUN_PREVIEW_DIR/principals\" --key-provider env\n)"
+      },
+      {
+        "title": "3. Save and recall one synthetic fact",
+        "description": "Open a second terminal on the same machine and run this sample. Expect inserted: 1, then evidence containing “Kestrel” and “violet”. Repeating it replays the write without adding another event. This proves source ingestion/recall, not model extraction or state readiness.",
+        "command": "export SHOGUN_PREVIEW_DIR=\"${SHOGUN_PREVIEW_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/shogunagent-preview-v0.1.0}\"\n(\n  set -eu\n  SHOGUN_PREVIEW_TOKEN=\"$(cat \"$SHOGUN_PREVIEW_DIR/api.token\")\"\n  curl --fail-with-body --silent --show-error http://127.0.0.1:7464/v1/memory/ingest \\\n    -H \"Authorization: Bearer $SHOGUN_PREVIEW_TOKEN\" -H 'Content-Type: application/json' \\\n    --data '{\"source\":\"website-preview\",\"actor\":\"agent:website-preview\",\"thread_key\":\"kestrel-demo\",\"idempotency_key\":\"kestrel-demo-v1\",\"events\":[{\"content\":\"The Kestrel demo codeword is violet.\"}]}'\n  printf '\\n'\n  curl --fail-with-body --silent --show-error http://127.0.0.1:7464/v1/memory/recall \\\n    -H \"Authorization: Bearer $SHOGUN_PREVIEW_TOKEN\" -H 'Content-Type: application/json' \\\n    --data '{\"query\":\"Kestrel\",\"budget_tokens\":1000}'\n  printf '\\n'\n)"
+      }
+    ],
+    "connect": "4. Connect your coding agent",
+    "connect_text": "The first-success sample uses authenticated HTTP because the source CLI’s MCP entry is read-only. To connect an app, follow the v0.1.0 source CLI guide using these binaries, the preview principal’s memory.db and matching key. Do not use npx or automatic connect until the npm package is published. Actual app compatibility is not established by the HTTP example.",
+    "errors": [
+      {
+        "title": "The download or checksum fails",
+        "body": "Stop; do not execute the archive. Check the release asset and your architecture. The setup refuses an existing directory: reuse a successful setup from step 2, or choose a new empty SHOGUN_PREVIEW_DIR after inspecting a failed attempt. Never delete or replace a real store to retry."
+      },
+      {
+        "title": "GLIBC error, exec format error or connection refused",
+        "body": "Check the selected Linux architecture and glibc requirement. Confirm the server terminal is running. Port 7464 must be free; do not stop another service blindly."
+      },
+      {
+        "title": "401, missing store, or memory_update_pending",
+        "body": "Use the token and store key from this preview directory. Start --multi for a new preview; the default single-store server does not initialize a database. Never generate a replacement key for existing encrypted data."
+      }
+    ]
+  }
 }

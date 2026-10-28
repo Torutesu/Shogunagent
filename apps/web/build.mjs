@@ -61,6 +61,14 @@ export function renderMarkdown(site) {
   p(`> ${site.tagline} ${site.motto}`);
   p(site.one_sentence);
   p(`**Status:** ${site.status_line}`);
+  p("## Get started", "", site.setup.requirements, "", site.setup.unsupported);
+  p(`[Published ${site.setup.version} release](${site.setup.release_url})`, "", "1. Download and verify ONE archive. These commands create a new private preview directory and refuse to overwrite an existing one. Review commands before running; do not enable shell tracing.");
+  for (const platform of site.setup.platforms) {
+    p(`### ${platform.label}`, `[Archive](${platform.archive}) · [Checksum](${platform.checksum})`, "", "```bash", platform.command, "```");
+  }
+  for (const step of site.setup.steps) p(`### ${step.title}`, step.description, "", "```bash", step.command, "```");
+  p(`### ${site.setup.connect}`, site.setup.connect_text, `[Source CLI guide](${site.setup.docs_url})`);
+  for (const error of site.setup.errors) p(`**${error.title}:** ${error.body}`);
   p(
     "Reading this as an agent? This page is also served as Markdown for `Accept: text/markdown`, " +
       `and indexed at ${site.url}/llms.txt. Everything that sends, posts or pays is L3 and waits for a human at an approval URL; do not try to route around it.`
@@ -146,6 +154,9 @@ export function renderLlmsTxt(site) {
   p("## Read first");
   for (const s of live) L.push(`- [${s.path}](${surfaceUrl(site, s)}): ${s.what}`);
   L.push(`- [README](${site.repo}#readme): strategy, pillars, pricing and roadmap in full (English and Japanese)`);
+  L.push(`- [Linux ${site.setup.version} release](${site.setup.release_url}): x64/ARM64 archives and checksums; npm/PyPI and hosted access remain unpublished`);
+  L.push(`- [First local success](${site.url}/index.md#get-started): platform requirements, fresh encrypted preview store, authenticated ingest and recall; no model calls`);
+  L.push(`- [Source CLI setup](${site.setup.docs_url}): existing-store prerequisites and read-only MCP; no working npx install is advertised`);
   L.push(`- [Implementation plan](${site.repo}/blob/main/docs/implementation-plan.md): epics, tasks and acceptance criteria`);
   L.push("");
   p("## Tools (core wire names, frozen)");
@@ -423,7 +434,7 @@ export function renderHtml(site, md) {
     operatingSystem: "Linux, macOS",
     license: "https://www.apache.org/licenses/LICENSE-2.0",
     codeRepository: site.repo,
-    offers: { "@type": "Offer", price: "0", priceCurrency: "USD", description: "Reads are free; usage-based pricing for ingest, runs and storage." },
+    offers: { "@type": "Offer", price: "0", priceCurrency: "USD", description: "Open-source local engine; infrastructure and model costs separate. Hosted checkout is unavailable." },
     softwareHelp: { "@type": "WebPage", url: `${site.url}/llms.txt` },
   };
 
@@ -477,8 +488,11 @@ export function renderHtml(site, md) {
   const chips = site.works_with.map((w) => `<span class="chip">${esc(w)}</span>`).join("");
 
   const heroTerm = term(
-    `<span class="c"># this page, for agents</span>\n<span class="k">curl</span> -sH <span class="s">'Accept: text/markdown'</span> https://${site.domain}/\n<span class="k">curl</span> -s https://${site.domain}/llms.txt\n\n<span class="c"># one command, your coding agent knows your open loops (Phase 1)</span>\n<span class="k">npx</span> shogunagent`
+    `<span class="c"># Read the setup guide; no commands execute automatically</span>\n<span class="k">curl</span> --fail --silent --show-error https://${site.domain}/index.md`
   );
+  const commands = (label, command) => `<pre><code>${esc(command)}</code></pre><button class="btn" type="button" data-copy="${esc(command)}">${esc(label)}</button>`;
+  const downloads = site.setup.platforms.map((p) => `<details class="glass"><summary>${esc(p.label)}</summary><p><a href="${esc(p.archive)}">Download archive</a> · <a href="${esc(p.checksum)}">SHA-256 checksum</a></p>${commands(`Copy ${p.label} setup`, p.command)}</details>`).join("\n");
+  const setupSteps = site.setup.steps.map((s) => `<div class="card glass"><h3>${esc(s.title)}</h3><p>${esc(s.description)}</p>${commands(`Copy ${s.title}`, s.command)}</div>`).join("\n");
 
   return `<!doctype html>
 <html lang="en">
@@ -548,16 +562,32 @@ export function renderHtml(site, md) {
   <h1><span class="grad">${esc(site.tagline)}</span></h1>
   <p class="lede" style="margin-top:14px">${esc(site.one_sentence)}</p>
   <div class="cta">
-    <a class="btn primary" href="/llms.txt">Read llms.txt</a>
-    <a class="btn" href="${esc(site.repo)}">GitHub ↗</a>
-    <a class="btn ghost" href="#agents">For agents ↓</a>
+    <a class="btn primary" href="#setup">Get started locally</a>
+    <a class="btn" href="${esc(site.setup.release_url)}">Linux ${esc(site.setup.version)} downloads ↗</a>
+    <a class="btn ghost" href="/llms.txt">For agents: llms.txt</a>
   </div>
   <div class="prompt glass">
     <span class="text"><b>Setup prompt</b> · paste into Claude Code, Codex or Cursor\n${esc(site.setup_prompt)}</span>
     <button type="button" data-copy="${esc(site.setup_prompt)}">Copy setup prompt</button>
   </div>
-  <div class="works"><span class="eyebrow">Works with</span>${chips}</div>
+  <div class="works"><span class="eyebrow">Client and framework integration paths in source</span>${chips}</div>
   ${heroTerm}
+</section>
+
+<section id="setup">
+  <p class="eyebrow">Get started · ${esc(site.setup.version)}</p>
+  <h2>Save one fact. Find it again.</h2>
+  <p class="lede">A local developer preview using synthetic text. No signup, hosted service or model API key required.</p>
+  <p>${esc(site.setup.requirements)}</p>
+  <h3>1. Download and verify your Linux build</h3>
+  <p>Choose one architecture. Review the commands before running them. They create a private preview directory and refuse to overwrite existing data. Do not enable shell tracing (<code>set -x</code>) or share key/token files.</p>
+  ${downloads}
+  <details class="glass"><summary>macOS or Windows</summary><p>${esc(site.setup.unsupported)}</p><p><a href="${esc(site.setup.docs_url)}">Read platform and source-build limitations</a></p></details>
+  <p id="copy-status" role="status" aria-live="polite" class="muted">Copying commands does not run them.</p>
+  ${setupSteps}
+  <div class="card glass"><h3>${esc(site.setup.connect)}</h3><p>${esc(site.setup.connect_text)}</p><a class="btn" href="${esc(site.setup.docs_url)}">Read the source CLI connection guide ↗</a></div>
+  <h3>If something fails</h3>
+  ${site.setup.errors.map((e) => `<details class="glass"><summary>${esc(e.title)}</summary><p>${esc(e.body)}</p></details>`).join("\n")}
 </section>
 
 <section id="agents">
@@ -568,7 +598,7 @@ export function renderHtml(site, md) {
     <thead><tr><th>Surface</th><th>What</th><th>Why an agent needs it</th><th>Status</th></tr></thead>
     <tbody>${surfacesRows}</tbody>
   </table></div>
-  <p class="muted" style="font-size:14px">Six principles behind this list: zero-config first call; every response self-describing (<code>usage</code>, <code>latency_ms</code>, <code>next_action</code>, <code>hints</code>); descriptions written for ranking, not marketing, and gated by a selection eval; at most one human approval, and only for money; stability an agent can measure (frozen wire names, idempotency keys, honored <code>Retry-After</code>); no self-preferencing in the router.</p>
+  <p class="muted" style="font-size:14px">Hosted surfaces are not publicly available. Local reads require authentication; free does not mean anonymous. The preview above tests source retrieval. Model-backed state extraction and actual coding-client connections require separate setup and validation.</p>
 </section>
 
 <section id="what">
@@ -651,7 +681,7 @@ export function renderHtml(site, md) {
     <div class="card glass"><h3>Open · ${esc(site.license)}</h3><p>${esc(site.open_source.open)}</p></div>
     <div class="card glass"><h3>Closed</h3><p>${esc(site.open_source.closed)}</p><p class="muted" style="margin-bottom:0;font-size:14px">${esc(site.open_source.telemetry)}</p></div>
   </div>
-  <div class="cta"><a class="btn primary" href="${esc(site.repo)}">Read the code ↗</a><a class="btn" href="${esc(site.repo)}/blob/main/README.md">Strategy README ↗</a></div>
+  <div class="cta"><a class="btn primary" href="#setup">Start the local preview</a><a class="btn" href="${esc(site.repo)}">Inspect the source ↗</a></div>
 </section>
 
 <section id="faq">
@@ -675,8 +705,8 @@ export function renderHtml(site, md) {
   btns.forEach(function(b){ b.addEventListener('click',function(){ setAud(b.dataset.aud); }); });
   try{ if(new URL(location.href).searchParams.get('agent')==='1') setAud('agent'); }catch(e){}
   document.querySelectorAll('[data-copy]').forEach(function(b){ b.addEventListener('click',function(){
-    var t=b.textContent; (navigator.clipboard?navigator.clipboard.writeText(b.dataset.copy):Promise.reject()).then(function(){b.textContent='Copied';},function(){b.textContent='Select and copy above';});
-    setTimeout(function(){b.textContent=t;},1800); }); });
+    var t=b.dataset.copyLabel||b.textContent, status=document.getElementById('copy-status'); b.dataset.copyLabel=t; (navigator.clipboard?navigator.clipboard.writeText(b.dataset.copy):Promise.reject()).then(function(){b.textContent='Copied';if(status)status.textContent='Copied. Review before pasting into a terminal.';},function(){b.textContent='Select and copy above';if(status)status.textContent='Clipboard unavailable. Select and copy the displayed text.';});
+    clearTimeout(b.copyTimer); b.copyTimer=setTimeout(function(){b.textContent=t;},1800); }); });
   var links=document.querySelectorAll('.side nav a, .mbar nav a'), secs=[].map.call(links,function(a){return document.querySelector(a.getAttribute('href'));});
   if('IntersectionObserver' in window){ var io=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ links.forEach(function(a){var on=a.getAttribute('href')==='#'+e.target.id;a.classList.toggle('current',on);var n=a.parentNode;if(on&&n.classList.contains('humanview')&&n.closest('.mbar')){n.scrollTo({left:Math.max(0,a.offsetLeft-14),behavior:'smooth'});}}); } }); },{rootMargin:'-20% 0px -70% 0px'});
     secs.forEach(function(s){ if(s) io.observe(s); }); }
