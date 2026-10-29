@@ -75,6 +75,21 @@ class ReleaseImageTest(unittest.TestCase):
         # Checking the full expression pins manual dispatch as build-only, even on a tag.
         self.assertNotIn("always()", self.jobs["image-index"]["if"])
 
+    def test_release_notes_exist_in_checked_out_tag_before_publication(self):
+        import tomllib
+        steps = self.jobs["github-release"]["steps"]
+        release_index = next(i for i, step in enumerate(steps)
+                             if step.get("uses", "").startswith("softprops/action-gh-release@"))
+        self.assertTrue(any(step.get("uses", "").startswith("actions/checkout@")
+                            for step in steps[:release_index]),
+                        "release notes are source files: this job needs its own checkout")
+        settings = steps[release_index]["with"]
+        self.assertEqual(settings["body_path"], "docs/releases/${{ github.ref_name }}.md")
+        version = tomllib.loads((ROOT / "crates/shogun-core/Cargo.toml").read_text())["package"]["version"]
+        notes = ROOT / settings["body_path"].replace("${{ github.ref_name }}", "v" + version)
+        self.assertTrue(notes.is_file(), "the shipping version needs release notes")
+        self.assertTrue(notes.read_text().startswith("# ShogunAgent v" + version + "\n"))
+
     def test_record_digest_validates_before_writing(self):
         script = self.step("image", name="record the platform digest")["run"]
         for digest in (DIGESTS["amd64"], "", "sha256:" + "z" * 64, "sha256:" + "a" * 63):
