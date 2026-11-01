@@ -3,8 +3,9 @@ name: deploy
 # Manual-only deploy of one Cloudflare Worker (E48; runbook: docs/deploy/production.md §3 and §4).
 # - Runs only when started by hand (workflow_dispatch) from main. Nothing deploys on push, tag or PR;
 #   scripts/check-workflow-yaml.py fails if this workflow gains another trigger.
-# - component: `relay` (apps/api, Worker `shogunai-relay`) or `router` (apps/router, Worker
-#   `shogunagent-router`). environment: `staging` or `production`, which is also the GitHub
+# - component: `relay` (apps/api, Worker `shogunai-relay`), `router` (apps/router, Worker
+#   `shogunagent-router`) or `web` (apps/web, the website Worker `shogunagent-web`; it has no route,
+#   so a deploy reaches its workers.dev address only until the owner attaches shogunagent.com). environment: `staging` or `production`, which is also the GitHub
 #   environment the deploy job runs in: configure each with the owner as a required reviewer and
 #   `main` as the only deployment branch, so every run waits for an approval.
 # - Dry run by default: `wrangler deploy --dry-run` (bundle only, nothing uploaded) unless `confirm`
@@ -22,7 +23,7 @@ on:
         description: "Worker to deploy"
         required: true
         type: choice
-        options: ["relay", "router"]
+        options: ["relay", "router", "web"]
       environment:
         description: "Target (also the GitHub environment whose reviewers must approve)"
         required: true
@@ -76,6 +77,10 @@ jobs:
               pnpm --filter @shogunagent/router build:catalog
               pnpm --filter @shogunagent/router check:bundle
               ;;
+            web)
+              pnpm --filter @shogun-ai/web typecheck
+              pnpm --filter @shogun-ai/web test
+              ;;
             *) echo "unknown component $COMPONENT" >&2; exit 1 ;;
           esac
 
@@ -110,6 +115,7 @@ jobs:
           case "$COMPONENT" in
             relay) dir=apps/api; filter=@shogun-ai/api; prod_name=shogunai-relay ;;
             router) dir=apps/router; filter=@shogunagent/router; prod_name=shogunagent-router ;;
+            web) dir=apps/web; filter=@shogun-ai/web; prod_name=shogunagent-web ;;
             *) echo "unknown component $COMPONENT" >&2; exit 1 ;;
           esac
           if [ "$TARGET_ENV" = "production" ]; then
@@ -139,6 +145,9 @@ jobs:
             echo "mode=$mode"
           } >> "$GITHUB_OUTPUT"
           echo "Target: $COMPONENT ($dir, $config) to $TARGET_ENV, mode $mode"
+      - name: build the website (dist/ is the Worker's assets)
+        if: inputs.component == 'web'
+        run: pnpm --filter @shogun-ai/web build
       - name: wrangler deploy --dry-run (nothing uploaded)
         if: steps.target.outputs.mode != 'deploy'
         env:
