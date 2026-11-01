@@ -11,7 +11,8 @@ Skill version 0.1.0. Check the repository's release status before relying on npm
 - [SKILL.md](https://github.com/Torutesu/Shogunagent/blob/main/SKILL.md): the skill agents install: when to use it and when not, setup, auth, precedence of facts, cost, what L1 / L2 / L3 mean for the caller, statuses and errors, numbered rules.
 - [CLI guide](https://github.com/Torutesu/Shogunagent/blob/main/packages/cli/README.md): existing-store prerequisites, source builds, explicit install/connect commands, local authentication and a synthetic first ingest.
 - [Agent API guide](https://github.com/Torutesu/Shogunagent/blob/main/apps/api/README-agent-api.md): The agent-facing half of the gateway: `sa_` keys, a prepaid micro-USD wallet, hard caps, the `402` contract, quotes, receipts, and the metered MCP proxy. Plan: `docs/implementation-plan.md` E3 / E9…
-- [README](https://github.com/Torutesu/Shogunagent/blob/main/README.md): what the product is, the three pillars, how state is acquired, pricing and roadmap.
+- [README](https://github.com/Torutesu/Shogunagent/blob/main/README.md): what is available today, the local quickstart, connecting an agent, verification and known limits.
+- [Strategy](https://github.com/Torutesu/Shogunagent/blob/main/docs/strategy.md): positioning, pricing model, go-to-market and roadmap (direction, not availability).
 
 ## API reference
 
