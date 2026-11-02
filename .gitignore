@@ -34,3 +34,6 @@ apps/router/listing-report.json
 
 # Private evaluation stores from the website quickstart
 .shogun-demo/
+
+# wrangler dry-run bundle of the website Worker
+apps/web/.deploy-dry-run/

@@ -246,11 +246,13 @@ $ROUTER hyperdrive create shogunagent-router-outbox --caching-disabled \
 
 ### 3.1 The manual deploy workflow (`.github/workflows/deploy.yml`)
 
+The workflow also deploys the website (component `web`, apps/web, Worker `shogunagent-web`). That Worker has no route, so a deploy reaches its workers.dev address only; moving shogunagent.com to it is a separate step in `apps/web/README.md` ("Deploy").
+
 Actions → *deploy* → Run workflow on `main`, with:
 
 | Input | Values | Meaning |
 |---|---|---|
-| `component` | `relay`, `router` | `apps/api` (Worker `shogunai-relay`) or `apps/router` (Worker `shogunagent-router`) |
+| `component` | `relay`, `router`, `web` | `apps/api` (Worker `shogunai-relay`), `apps/router` (Worker `shogunagent-router`) or `apps/web` (Worker `shogunagent-web`, the website) |
 | `environment` | `staging`, `production` | the target, and the GitHub environment the deploy job runs in |
 | `confirm` | empty (default) or `deploy-<component>-<environment>` | anything but the exact phrase is a dry run: `wrangler deploy --dry-run`, nothing uploaded |
 

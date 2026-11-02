@@ -66,7 +66,21 @@ The supporting pages cover product, demos, integrations, documentation, pricing,
 
 ## Publication handoff
 
-This task prepares a local build; production has not been changed. Before replacing shogunagent.com, identify its existing hosting project and source, preserve its rollback deployment, review hosted pricing/availability and operator privacy terms, and serve `dist/` with directory-index routes and a proper 404. The included preview server supports HTML/Markdown negotiation at `/`; static hosting needs the equivalent route rule to preserve that behavior. No host identity or deployment credentials are added here.
+## Deploy
+
+The live shogunagent.com currently serves an older homepage, so links in this build such as `/docs/quickstart/` answer 404 there. Publishing this build fixes that. The repository now carries everything needed to publish it; the publish itself is an owner step.
+
+- `worker.mjs` is a Cloudflare Worker in front of `dist/` (Workers Static Assets). It answers the way `scripts/serve.mjs` does: GET and HEAD only (405 otherwise), `/` returns `index.md` for `Accept: text/markdown` or `?agent=1`, directory paths serve their `index.html`, unknown paths get `404.html` with status 404, and every answer carries `nosniff` and the referrer policy. `test/worker.test.mjs` checks this against the built site.
+- `wrangler.jsonc` names the Worker `shogunagent-web` and has **no route**: a deploy publishes to its workers.dev address only and does not touch shogunagent.com.
+- Deploy with the manual workflow (`.github/workflows/deploy.yml`, component `web`): it builds the site, runs the tests and makes a dry run unless `confirm` is `deploy-web-production` (or `deploy-web-staging`). `pnpm --filter @shogun-ai/web deploy:dry-run` does the same dry run locally.
+
+Steps to replace the live site:
+
+1. Find the Cloudflare project that serves shogunagent.com today and keep it for rollback.
+2. Review the pages first: hosted prices are estimates, and the website privacy page and availability notes must match what is live.
+3. Run the workflow with component `web` and confirm the deploy. Check the workers.dev address: `/`, `/docs/quickstart/`, `/llms.txt`, `/index.md`, a Markdown request to `/`, and a 404.
+4. Attach shogunagent.com to the `shogunagent-web` Worker as a custom domain in the Cloudflare dashboard, and remove it from the old project. Roll back by moving the domain back.
+5. Re-run the checks in step 3 on shogunagent.com.
 
 ### MacBook asset provenance
 

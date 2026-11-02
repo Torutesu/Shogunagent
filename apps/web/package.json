@@ -7,9 +7,13 @@
     "build": "node build.mjs",
     "dev": "node build.mjs && node scripts/serve.mjs",
     "test": "node build.mjs && node --test test/*.test.mjs",
-    "typecheck": "node --check build.mjs && node --check app.js && node --check content.mjs && node --check onboarding.mjs && node --check setup-prompt.mjs && node --check laptop.js && node --check visuals.js && node --check scripts/serve.mjs"
+    "typecheck": "node --check build.mjs && node --check app.js && node --check content.mjs && node --check onboarding.mjs && node --check setup-prompt.mjs && node --check laptop.js && node --check visuals.js && node --check scripts/serve.mjs && node --check worker.mjs",
+    "deploy:dry-run": "node build.mjs && wrangler deploy --dry-run --outdir .deploy-dry-run"
   },
   "engines": {
     "node": ">=22"
+  },
+  "devDependencies": {
+    "wrangler": "^4.151.3"
   }
 }

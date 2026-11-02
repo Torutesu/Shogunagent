@@ -56,7 +56,8 @@ export function renderLlmsTxt(files) {
   lines.push(`- [SKILL.md](${REPO}/SKILL.md): the skill agents install: when to use it and when not, setup, auth, precedence of facts, cost, what L1 / L2 / L3 mean for the caller, statuses and errors, numbered rules.`);
   lines.push(`- [CLI guide](${REPO}/packages/cli/README.md): existing-store prerequisites, source builds, explicit install/connect commands, local authentication and a synthetic first ingest.`);
   lines.push(`- [Agent API guide](${REPO}/apps/api/README-agent-api.md): ${truncate(firstParagraph(files["apps/api/README-agent-api.md"]), 200)}`);
-  lines.push(`- [README](${REPO}/README.md): what the product is, the three pillars, how state is acquired, pricing and roadmap.`);
+  lines.push(`- [README](${REPO}/README.md): what is available today, the local quickstart, connecting an agent, verification and known limits.`);
+  lines.push(`- [Strategy](${REPO}/docs/strategy.md): positioning, pricing model, go-to-market and roadmap (direction, not availability).`);
   lines.push("");
   lines.push("## API reference");
   lines.push("");

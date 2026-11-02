@@ -187,7 +187,7 @@ Known launch limits:
 
 ShogunAgent develops the state and permission engine from [ShogunAI](docs/MIGRATION.md) for agents and self-hosted services. The focus is shared work state, source evidence, portable exports and controlled actions. The engine is Apache-2.0; operating it can still incur infrastructure and model costs. Hosted prices in source are estimates, not an available checkout offer.
 
-Mem0, Graphiti/Zep, Letta and Supermemory have overlapping capabilities. Typed state, temporal retrieval and local deployment are not exclusive differentiators; compare specific editions and evaluate with the same harness before claiming superiority. Product plans and owner decisions live in the [implementation plan](docs/implementation-plan.md), [decision records](docs/decisions/) and [research](research_notes/). Directory submissions, provider registrations, legal/operator details and hosted rollout are separate launch work.
+Mem0, Graphiti/Zep, Letta and Supermemory have overlapping capabilities. Typed state, temporal retrieval and local deployment are not exclusive differentiators; compare specific editions and evaluate with the same harness before claiming superiority. The product strategy is in [docs/strategy.md](docs/strategy.md) ([日本語](docs/strategy.ja.md)). Product plans and owner decisions live in the [implementation plan](docs/implementation-plan.md), [decision records](docs/decisions/) and [research](research_notes/). Directory submissions, provider registrations, legal/operator details and hosted rollout are separate launch work.
 
 ## Develop and contribute
 
@@ -199,7 +199,7 @@ cargo run --locked -p shogun-core --features daemon-server --example maya_handof
 node scripts/gen-llms-txt.mjs --check
 ```
 
-README changes feed generated agent documentation. Regenerate it with `node scripts/gen-llms-txt.mjs --write`; do not edit generated files by hand.
+README changes feed generated agent documentation. Regenerate it with `node scripts/gen-llms-txt.mjs --write`; do not edit generated files by hand. Update [README.ja.md](README.ja.md) in the same change so the two stay in step.
 
 | Directory | Responsibility |
 |---|---|
