@@ -2620,7 +2620,7 @@ version = "0.1.0"
 
 [[package]]
 name = "shogun-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde_json",
  "shogun-agents",
@@ -2631,7 +2631,7 @@ dependencies = [
 
 [[package]]
 name = "shogun-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64 0.22.1",
  "block2",
@@ -2719,7 +2719,7 @@ dependencies = [
 
 [[package]]
 name = "shogun-mcp"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "axum",
  "base64 0.22.1",

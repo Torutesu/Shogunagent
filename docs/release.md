@@ -11,7 +11,7 @@ owner has confirmed it.
 | `shogunagent` | PyPI | `packages/sdk-py` | `.github/workflows/publish-pypi.yml` |
 
 The Rust binaries and the container image have their own tag-driven workflow (`release.yml`); this
-document does not cover them, except where the CLI depends on them (below). Native container
+document describes their version boundary below. Native container
 builds and the proposed image-only recovery procedure are documented in
 [container release recovery](container-release-recovery.md).
 
@@ -96,3 +96,17 @@ builds and the proposed image-only recovery procedure are documented in
   do, one or two sentences, no internal ticket numbers without context.
 - A PR that changes a published package's behavior adds its entry under `## Unreleased` in the same
   PR (Conventional Commits still apply to the commit message).
+
+## Rust binary and container releases
+
+The next binary/container release is **v0.2.0**. The shipping Rust packages `shogun-core`,
+`shogun-mcp` and `shogun-cli` carry this version; internal Rust libraries, benchmark packages,
+Node CLI and SDKs retain their independent versions. Updating these manifests and Cargo.lock
+does not publish a registry package. MCP initialization reports the Rust MCP package version.
+
+Prepare version changes, root CHANGELOG.md and `docs/releases/vX.Y.Z.md` on a focused branch.
+The tag-driven workflow includes that notes file in the GitHub release. Merge only after
+required review/checks, then tag the verified green main commit; never retarget a published tag.
+`release.yml` builds Linux x86_64 and ARM64 archives/checksums and native container images;
+its image-index job publishes the version tag and latest. Verify binary assets and container
+manifest outcomes separately. npm/PyPI publication and hosted deployments are separate actions.
