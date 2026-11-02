@@ -29,6 +29,7 @@ describe("catalog compile (E8-T2)", () => {
       "shogunagent.state.commitments.list",
       "shogunagent.state.open_loops.list",
       "shogunagent.state.people.get",
+      "shogunagent.state.people.list",
       "slack.messages.post",
     ]);
     for (const e of catalog.entries()) {

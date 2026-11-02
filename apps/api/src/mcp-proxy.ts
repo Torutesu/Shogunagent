@@ -54,9 +54,25 @@ export const SIDECAR_MCP_PATH = "/mcp";
 export const STATE_READ_ROUTES = Object.freeze([
   { method: "get", path: "/v1/state/commitments", tool: "state.commitments.list" },
   { method: "get", path: "/v1/state/open_loops", tool: "state.open_loops.list" },
-  { method: "get", path: "/v1/state/people/:person", tool: "state.people.get" },
+  { method: "get", path: "/v1/state/people", tool: "state.people.list" },
+  // The core's person ids are integers; anything else is not a state read.
+  { method: "get", path: "/v1/state/people/:person{[0-9]+}", tool: "state.people.get" },
   { method: "post", path: "/v1/memory/recall", tool: "memory.recall" },
 ] as const);
+/** A route path without its parameter patterns (`/v1/state/people/:person`): the log and
+ * OpenAPI template. */
+export function routePathTemplate(path: string): string {
+  return path.replace(/\{[^}]*\}/g, "");
+}
+const STATE_READ_PATTERNS = STATE_READ_ROUTES.map((route) => ({
+  route,
+  pattern: new RegExp(`^${route.path.replace(/:\w+(?:\{([^}]*)\})?/g, (_match, re: string | undefined) => `(?:${re ?? "[^/]+"})`)}$`),
+}));
+/** The state read `method` and `pathname` match, if any. HEAD is answered by the GET route. */
+export function stateReadRouteOf(method: string, pathname: string): (typeof STATE_READ_ROUTES)[number] | undefined {
+  const wanted = method.toUpperCase() === "HEAD" ? "GET" : method.toUpperCase();
+  return STATE_READ_PATTERNS.find(({ route, pattern }) => route.method.toUpperCase() === wanted && pattern.test(pathname))?.route;
+}
 /** The sidecar paths the relay serves: the MCP transport, the REST handoff route whose object the
  * core assembles (E35), and the REST face of `payments.*` (E51, docs/api/payments.md). The
  * request's own path picks one; anything else goes to `/mcp`. */
@@ -71,9 +87,7 @@ export function sidecarPathOf(request: Request): string {
   try {
     const url = new URL(request.url);
     path = url.pathname;
-    const stateRead = STATE_READ_ROUTES.some((route) => route.method.toUpperCase() === request.method &&
-      (route.path === path || (route.path === "/v1/state/people/:person" && /^\/v1\/state\/people\/[^/]+$/.test(path))));
-    if (stateRead) return path + url.search;
+    if (stateReadRouteOf(request.method, path)) return path + url.search;
   } catch {
     return SIDECAR_MCP_PATH;
   }

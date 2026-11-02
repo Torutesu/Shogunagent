@@ -12,7 +12,7 @@ describe("the router's first-party state reads through the hosted gateway", () =
     });
     const rig = makeAgentRig({ mcpUpstream: relay.upstream, mcpAdmit: relay.admit });
     const agent = await registerAgent(rig);
-    const paths = ["/v1/state/commitments?limit=2", "/v1/state/open_loops", "/v1/state/people/42"];
+    const paths = ["/v1/state/commitments?limit=2", "/v1/state/open_loops", "/v1/state/people?limit=5", "/v1/state/people/42"];
     for (const path of paths) {
       const reply = await authed(rig, agent.key, path, { headers: { "mcp-name": "memory.ingest", "mcp-quantity": "999" } });
       expect(reply.status, path).toBe(200);
@@ -31,10 +31,37 @@ describe("the router's first-party state reads through the hosted gateway", () =
 
   it("authenticates state reads before contacting the sidecar", async () => {
     const rig = makeAgentRig();
-    for (const path of ["/v1/state/commitments", "/v1/state/open_loops", "/v1/state/people/42"]) {
+    for (const path of ["/v1/state/commitments", "/v1/state/open_loops", "/v1/state/people", "/v1/state/people/42"]) {
       expect((await rig.app.request(path)).status, path).toBe(401);
     }
     expect((await rig.app.request("/v1/memory/recall", { method: "POST", body: "{}" })).status).toBe(401);
     expect(rig.upstreamCalls).toHaveLength(0);
+  });
+
+  it("takes only the core's numeric person ids and never relays a name", async () => {
+    const seen: string[] = [];
+    const relay = createMcpRelay({ url: "http://127.0.0.1:7464", bearerSecret: "local-test-sidecar-secret-32-characters" }, async (url) => {
+      seen.push(url);
+      return new Response('{"results":[]}', { headers: { "content-type": "application/json" } });
+    });
+    const rig = makeAgentRig({ mcpUpstream: relay.upstream, mcpAdmit: relay.admit });
+    const agent = await registerAgent(rig);
+    for (const path of ["/v1/state/people/Mika", "/v1/state/people/p_12"]) {
+      expect((await authed(rig, agent.key, path)).status, path).toBe(404);
+    }
+    expect(seen).toEqual([]);
+  });
+
+  it("relays a HEAD on a state read to that read's own path, as the GET route meters it", async () => {
+    const seen: Array<{ url: string; method: string }> = [];
+    const relay = createMcpRelay({ url: "http://127.0.0.1:7464", bearerSecret: "local-test-sidecar-secret-32-characters" }, async (url, init) => {
+      seen.push({ url, method: init?.method ?? "GET" });
+      return new Response(null, { headers: { "content-type": "application/json" } });
+    });
+    const rig = makeAgentRig({ mcpUpstream: relay.upstream, mcpAdmit: relay.admit });
+    const agent = await registerAgent(rig);
+    const reply = await authed(rig, agent.key, "/v1/state/commitments", { method: "HEAD" });
+    expect(reply.status).toBe(200);
+    expect(seen.map(({ url }) => url)).toEqual(["http://127.0.0.1:7464/v1/state/commitments"]);
   });
 });

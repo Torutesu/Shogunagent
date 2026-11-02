@@ -131,16 +131,16 @@ describe("run (E8-T5)", () => {
   });
 
   it("a free first-party read runs without a key being charged, but needs the caller's bearer to reach the state face", async () => {
-    const deps = makeDeps({ responder: () => ({ status: 200, body: { items: [{ id: "c_1" }], next_cursor: null } }) });
+    const deps = makeDeps({ responder: () => ({ status: 200, body: { tool: "state.commitments.list", results: [{ text: "Send the deck", confidence: 0.9, possibly: false, table: "commitments", id: 1 }] } }) });
     const noKey = await run(deps, { input: { tool_id: "shogunagent.state.commitments.list", input: {}, idempotency_key: "fp0" } });
     expect(noKey.status).toBe(401);
     if ("error" in noKey.body) expect(noKey.body.error.next_action).toBe("authenticate");
     expect(deps.calls).toHaveLength(0);
-    const withKey = await run(deps, { input: { tool_id: "shogunagent.state.commitments.list", input: { status: "open" }, idempotency_key: "fp1" }, bearer: bearer() });
+    const withKey = await run(deps, { input: { tool_id: "shogunagent.state.commitments.list", input: { limit: 5 }, idempotency_key: "fp1" }, bearer: bearer() });
     expect(withKey.status).toBe(200);
     expect(withKey.body.usage.cost_micro_usd).toBe(0);
     expect(deps.metering.balanceOf(AGENT_KEY)).toBe(1_000_000);
-    expect(deps.calls.at(-1)?.request).toEqual({ method: "GET", path: "/v1/state/commitments", query: { status: "open" } });
+    expect(deps.calls.at(-1)?.request).toEqual({ method: "GET", path: "/v1/state/commitments", query: {} });
   });
 
   it("every response carries usage and latency_ms, and errors carry next_action", async () => {
