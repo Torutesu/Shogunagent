@@ -1,75 +1,68 @@
-import { defineEndpoint, z, zodInput } from "../../define.js";
+import { defineEndpoint, zodInput } from "../../define.js";
+import { pageStateList, stateListInput, stateListIsEmpty, stateListRequest } from "../state-list.js";
 
 export const stateCommitmentsList = defineEndpoint({
   id: "state.commitments.list",
   meta: {
-    summary: "Find what the user committed to: promises, deliverables and deadlines they made to others.",
+    summary: "Find what the user committed to: promises and deliverables still open.",
     description:
-      "Lists the user's commitments — things the user said they would do, with the person they owe it to, the due date when known, the status (open, done, overdue) and the quoted evidence behind each. " +
-      "Use for: what did the user commit to, what does the user owe someone, what is due this week, which promises are overdue, what has the user promised to deliver. " +
+      "Lists the user's open commitments: things the user said they would do. Done, cancelled and snoozed ones are left out. Each row has its text, confidence, a `possibly` flag and its row id. " +
+      "Use for: what did the user commit to, what does the user owe, what is still open from their promises. " +
       "Free read (L1); scoped to your agent key.",
-    exclusions: "Not for tasks other people owe the user (use state.open_loops.list), calendar events, or raw notes.",
+    exclusions: "Not for tasks other people owe the user (use state.open_loops.list), calendar events, raw notes, or finished commitments.",
     categories: ["state", "memory"],
     notes: [
-      "Each item carries confidence and provenance (the event and quote it was extracted from); treat confidence below 0.8 as a lead, not a fact.",
-      "Pass `person` to narrow to commitments made to one person; pass `due_before` (ISO date) for a deadline window.",
+      "Rows marked `possibly` are uncertain: treat them as leads, not facts. Low-confidence rows are hidden unless `include_low`.",
+      "Newest first and paged: `limit` (default 50) from `offset`, with `total` and `truncated`.",
     ],
     examples: [
       {
-        input: { status: "open", limit: 5 },
+        input: { limit: 5 },
         output: {
-          items: [
-            { id: "c_1", text: "send the revised deck to Mika", to_person: "Mika", due: "2026-10-27", status: "open", confidence: 0.91, provenance: { event_id: "e_8812", quote: "I'll send the revised deck by Monday" } },
-          ],
-          next_cursor: null,
+          tool: "state.commitments.list",
+          results: [{ text: "Send the revised deck to Mika by Monday", confidence: 0.91, possibly: false, table: "commitments", id: 31 }],
+          total: 1,
+          truncated: false,
         },
       },
     ],
   },
   request: { method: "GET", path: "/v1/state/commitments" },
   input: {
-    schema: zodInput(
-      z
-        .object({
-          status: z.enum(["open", "done", "overdue", "all"]).optional().describe("Default: open."),
-          person: z.string().min(1).max(200).optional().describe("Name or id of the person the commitment was made to."),
-          due_before: z.string().date().optional().describe("ISO date; only commitments due on or before it."),
-          limit: z.number().int().min(1).max(100).optional().describe("Default 20."),
-          cursor: z.string().optional(),
-        })
-        .strict(),
-    ),
+    schema: zodInput(stateListInput),
+    toRequest: stateListRequest("/v1/state/commitments"),
   },
   output: {
-    fromResponse: ({ response }) => response.body,
+    fromResponse: pageStateList({ keepOrder: false }),
+    isEmpty: stateListIsEmpty,
   },
   usage: { model: "per_call", cost_micro_usd: 0 },
   scope: { class: "read" },
   fixtures: [
     {
       scenario: "open-commitments",
-      input: { status: "open", limit: 2 },
+      input: { limit: 2 },
       response: {
         status: 200,
         body: {
-          items: [
-            { id: "c_1", text: "send the revised deck to Mika", to_person: "Mika", due: "2026-10-27", status: "open", confidence: 0.91, provenance: { event_id: "e_8812", quote: "I'll send the revised deck by Monday" } },
-            { id: "c_2", text: "review the contract draft", to_person: "Jun", due: null, status: "open", confidence: 0.86, provenance: { event_id: "e_8901", quote: "I will review the contract draft tonight" } },
+          tool: "state.commitments.list",
+          results: [
+            { text: "Review the contract draft", confidence: 0.86, possibly: false, table: "commitments", id: 30 },
+            { text: "Send the revised deck to Mika by Monday", confidence: 0.91, possibly: false, table: "commitments", id: 31 },
           ],
-          next_cursor: null,
         },
       },
       expect: { usage: { quantity: 1, cost_micro_usd: 0 } },
     },
     {
       scenario: "nothing-open",
-      input: { status: "open" },
-      response: { status: 200, body: { items: [], next_cursor: null } },
+      input: {},
+      response: { status: 200, body: { tool: "state.commitments.list", results: [] } },
       expect: { usage: { quantity: 0, cost_micro_usd: 0 } },
     },
     {
       scenario: "synthetic-state-unavailable",
-      input: { status: "open" },
+      input: {},
       response: { status: 503, body: { error: "unavailable" } },
       expect: { error: true },
     },

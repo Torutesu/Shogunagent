@@ -30,6 +30,7 @@ export type ErrorCode =
   | "authentication_required"
   | "payment_required"
   | "provider_unavailable"
+  | "not_found"
   | "upstream_error";
 
 export interface ErrorBody {
@@ -81,6 +82,7 @@ export const ERROR_STATUS: Record<ErrorCode, number> = {
   authentication_required: 401,
   payment_required: 402,
   provider_unavailable: 503,
+  not_found: 404,
   upstream_error: 502,
 };
 

@@ -14,6 +14,8 @@
 import { createHash } from "node:crypto";
 import type { MiddlewareHandler } from "hono";
 
+import { routePathTemplate, stateReadRouteOf } from "./mcp-proxy.js";
+
 export type LogFn = (line: string) => void;
 
 /**
@@ -106,8 +108,8 @@ export function routeTemplate(pathname: string): string {
     "/v1/stripe/webhook", "/v1/quote", "/v1/receipts", "/v1/handoff", "/mcp", "/.well-known/pricing.json"].includes(pathname)) return pathname;
   // E51: the ingest-key issue route and the payments REST relay (fixed paths, no ids).
   if (["/v1/keys", "/v1/payments/mandates", "/v1/payments/mandates/list", "/v1/payments/mandates/request", "/v1/payments/mandates/revoke", "/v1/payments/spend"].includes(pathname)) return pathname;
-  if (["/v1/state/commitments", "/v1/state/open_loops", "/v1/memory/recall"].includes(pathname)) return pathname;
-  if (/^\/v1\/state\/people\/[^/]+$/.test(pathname)) return "/v1/state/people/:person";
+  const stateRead = stateReadRouteOf("GET", pathname) ?? stateReadRouteOf("POST", pathname);
+  if (stateRead) return routePathTemplate(stateRead.path);
   // The agent-readable documents (plan E10, wellknown/app.ts): fixed paths, no ids.
   if (["/.well-known/mcp/server-card.json", "/.well-known/agent-card.json", "/.well-known/status.json", "/.well-known/mcp-config",
     "/health", "/openapi.json", "/llms.txt", "/llms-full.txt", "/privacy", "/terms"].includes(pathname)) return pathname;

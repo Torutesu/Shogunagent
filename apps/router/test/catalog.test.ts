@@ -29,6 +29,7 @@ describe("catalog compile (E8-T2)", () => {
       "shogunagent.state.commitments.list",
       "shogunagent.state.open_loops.list",
       "shogunagent.state.people.get",
+      "shogunagent.state.people.list",
       "slack.messages.post",
     ]);
     for (const e of catalog.entries()) {
@@ -82,7 +83,9 @@ describe("catalog compile (E8-T2)", () => {
           continue;
         }
         if (fx.expect?.error) {
-          expect(out.status).toBeGreaterThanOrEqual(500);
+          // A provider 404 is the caller's unknown id (not_found); any other failure is the provider's.
+          if (fx.response.status === 404) expect(out.status, `${entry.tool_id}/${fx.scenario}`).toBe(404);
+          else expect(out.status, `${entry.tool_id}/${fx.scenario}`).toBeGreaterThanOrEqual(500);
           expect(out.body.usage.cost_micro_usd).toBe(0);
           continue;
         }

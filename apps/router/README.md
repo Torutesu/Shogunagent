@@ -118,6 +118,7 @@ curl -s -X POST http://localhost:8787/v1/router/run \
 | unknown tool / not in table | `error` `tool_not_found` / `operation_denied` | 404 / 403 | `discover` |
 | no key for a metered or first-party tool | `error` `authentication_required` | 401 | `authenticate` |
 | wallet short | `error` `payment_required` + x402-shaped `payment` | 402 | `top_up` |
+| provider answered 404: nothing exists for this input (an unknown id) | `error` `not_found` ($0, not counted against the provider's health) | 404 | `fix_input` |
 | provider failed / unreachable | `error` `upstream_error` ($0) | 502 | `try_alternative` / `retry_after` |
 | provider not configured | `error` `provider_unavailable` | 503 | `try_alternative` |
 | wallet unavailable / throttled (E48) | `error` `provider_unavailable` / `rate_limited`, with `retry_after` and the `Retry-After` header carrying the wallet's own value | 503 / 429 | `retry_after` |
