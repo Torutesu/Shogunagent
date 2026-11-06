@@ -81,17 +81,32 @@ export const SIDECAR_PATHS: readonly string[] = Object.freeze([
   "/v1/payments/mandates", "/v1/payments/mandates/list", "/v1/payments/mandates/request", "/v1/payments/mandates/revoke", "/v1/payments/spend",
 ]);
 
-/** The sidecar path for `request`: its own path when the relay serves it, else `/mcp`. */
-export function sidecarPathOf(request: Request): string {
-  let path = SIDECAR_MCP_PATH;
+/** `pathname` with each segment percent-decoded, as the router matches it; undefined when a
+ * segment is malformed or decodes to a `/` (it would become another path). */
+function decodedPath(pathname: string): string | undefined {
+  try {
+    const segments = pathname.split("/").map((segment) => decodeURIComponent(segment));
+    return segments.some((segment) => segment.includes("/")) ? undefined : segments.join("/");
+  } catch {
+    return undefined;
+  }
+}
+
+/** Where and how the relay calls the sidecar for `request`. A state read goes to its own path, in
+ * its decoded form (`/v1/state/people/%34%32` is person 42, as the router matched it), and a HEAD
+ * on one is sent as the GET the core serves. The other relayed paths keep the request's method;
+ * anything else goes to `/mcp`. */
+export function sidecarTargetOf(request: Request): { path: string; method: string } {
   try {
     const url = new URL(request.url);
-    path = url.pathname;
-    if (stateReadRouteOf(request.method, path)) return path + url.search;
+    const decoded = decodedPath(url.pathname);
+    if (decoded !== undefined && stateReadRouteOf(request.method, decoded)) {
+      return { path: decoded + url.search, method: request.method === "HEAD" ? "GET" : request.method };
+    }
+    return { path: SIDECAR_PATHS.includes(url.pathname) ? url.pathname : SIDECAR_MCP_PATH, method: request.method };
   } catch {
-    return SIDECAR_MCP_PATH;
+    return { path: SIDECAR_MCP_PATH, method: request.method };
   }
-  return SIDECAR_PATHS.includes(path) ? path : SIDECAR_MCP_PATH;
 }
 /** How long the sidecar may take to send its reply headers. The body is not under this deadline. */
 export const SIDECAR_HEADERS_TIMEOUT_MS = 30_000;
@@ -254,16 +269,17 @@ export function createMcpRelay(config: McpRelayConfig, fetchFn: FetchFn = (input
       // long reply stream is never cut by it.
       const abort = new AbortController();
       const timer = setTimeout(() => abort.abort(), headersTimeoutMs);
+      const target = sidecarTargetOf(request);
       let reply: Response;
       try {
         const init: RequestInit & { duplex?: "half" } = {
-          method: request.method,
+          method: target.method,
           headers,
           signal: abort.signal,
           redirect: "manual",
           ...(hasBody ? { body: request.body, duplex: "half" } : {}),
         };
-        reply = await fetchFn(`${base}${sidecarPathOf(request)}`, init);
+        reply = await fetchFn(`${base}${target.path}`, init);
       } finally {
         clearTimeout(timer);
       }
@@ -277,6 +293,11 @@ export function createMcpRelay(config: McpRelayConfig, fetchFn: FetchFn = (input
       for (const name of RELAYED_REPLY_HEADERS) {
         const v = reply.headers.get(name);
         if (v !== null) out.set(name, v);
+      }
+      // A HEAD the core answered as a GET gets that answer's status and headers, without the body.
+      if (request.method === "HEAD") {
+        await reply.body?.cancel().catch(() => undefined);
+        return new Response(null, { status: reply.status, headers: out });
       }
       return new Response(reply.body, { status: reply.status, headers: out });
     },

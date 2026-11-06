@@ -6583,7 +6583,7 @@
             }
           },
           "404": {
-            "description": "tool_not_found",
+            "description": "tool_not_found | not_found (the provider found nothing for this input, $0)",
             "content": {
               "application/json": {
                 "schema": {

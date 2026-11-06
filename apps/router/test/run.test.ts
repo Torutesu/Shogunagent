@@ -143,6 +143,17 @@ describe("run (E8-T5)", () => {
     expect(deps.calls.at(-1)?.request).toEqual({ method: "GET", path: "/v1/state/commitments", query: {} });
   });
 
+  it("an unknown id answers not_found (404, fix_input, $0), not a retryable upstream error", async () => {
+    const deps = makeDeps({ responder: () => ({ status: 404, body: { error: { code: "not_found" } } }) });
+    const res = await run(deps, { input: { tool_id: "shogunagent.state.people.get", input: { id: 42 }, idempotency_key: "nf1" }, bearer: bearer() });
+    expect(res.status).toBe(404);
+    if (!("error" in res.body)) throw new Error("expected an error body");
+    expect(res.body.error.code).toBe("not_found");
+    expect(res.body.error.next_action).toBe("fix_input");
+    expect(res.body.usage.cost_micro_usd).toBe(0);
+    expect(deps.calls.at(-1)?.request).toEqual({ method: "GET", path: "/v1/state/people/42" });
+  });
+
   it("every response carries usage and latency_ms, and errors carry next_action", async () => {
     const deps = makeDeps({ responder: () => okResponse });
     const results = await Promise.all([
