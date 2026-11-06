@@ -68,19 +68,19 @@ The supporting pages cover product, demos, integrations, documentation, pricing,
 
 ## Deploy
 
-The live shogunagent.com currently serves an older homepage, so links in this build such as `/docs/quickstart/` answer 404 there. Publishing this build fixes that. The repository now carries everything needed to publish it; the publish itself is an owner step.
+Production is the `shogunagent-web` Worker, serving `shogunagent.com` and `www.shogunagent.com`. Its domain mappings are declared in `wrangler.jsonc`; no API Worker or domain is part of this deployment.
 
-- `worker.mjs` is a Cloudflare Worker in front of `dist/` (Workers Static Assets). It answers the way `scripts/serve.mjs` does: GET and HEAD only (405 otherwise), `/` returns `index.md` for `Accept: text/markdown` or `?agent=1`, directory paths serve their `index.html`, unknown paths get `404.html` with status 404, and every answer carries `nosniff` and the referrer policy. `test/worker.test.mjs` checks this against the built site.
-- `wrangler.jsonc` names the Worker `shogunagent-web` and has **no route**: a deploy publishes to its workers.dev address only and does not touch shogunagent.com.
-- Deploy with the manual workflow (`.github/workflows/deploy.yml`, component `web`): it builds the site, runs the tests and makes a dry run unless `confirm` is `deploy-web-production` (or `deploy-web-staging`). `pnpm --filter @shogun-ai/web deploy:dry-run` does the same dry run locally.
+Cloudflare Workers Builds is connected to `Torutesu/Shogunagent`, production branch **main**, repository root `/`. Pushes to main build and deploy the website automatically. Preview-branch builds are disabled. The connection was enabled on 2026-11-06; the first publication restored the main-branch documentation pages as well as the homepage.
 
-Steps to replace the live site:
+- Build command: `pnpm --filter @shogun-ai/web typecheck && pnpm --filter @shogun-ai/web test` (the test script builds all pages first).
+- Deploy command: `pnpm --filter @shogun-ai/web exec wrangler deploy --config wrangler.jsonc`.
+- Authentication stays in Cloudflare's build settings, never in the repository.
+- Failed tests stop publication and leave the previous deployment active.
+- The existing GitHub Actions manual deploy workflow remains available as a fallback; it does not run on pushes. Relay and router deployment policies are unchanged.
 
-1. Find the Cloudflare project that serves shogunagent.com today and keep it for rollback.
-2. Review the pages first: hosted prices are estimates, and the website privacy page and availability notes must match what is live.
-3. Run the workflow with component `web` and confirm the deploy. Check the workers.dev address: `/`, `/docs/quickstart/`, `/llms.txt`, `/index.md`, a Markdown request to `/`, and a 404.
-4. Attach shogunagent.com to the `shogunagent-web` Worker as a custom domain in the Cloudflare dashboard, and remove it from the old project. Roll back by moving the domain back.
-5. Re-run the checks in step 3 on shogunagent.com.
+Verify `/`, `/docs/quickstart/`, `/docs/state-walkthrough/`, `/llms.txt`, `/index.md`, a Markdown request to `/`, and a real 404 after publication. Compare the deployed homepage with `dist/index.html` from the deployed commit. Check the build's source SHA in Cloudflare.
+
+Rollback: select the previous version in Cloudflare Deployments, then revert the faulty commit on main so the next automatic build keeps the correction. The pre-migration version is `c4cbff3b-444a-4337-9693-942359513bec` (2026-10-27).
 
 ### MacBook asset provenance
 
