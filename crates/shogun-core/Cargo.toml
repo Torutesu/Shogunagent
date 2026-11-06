@@ -172,13 +172,6 @@ name = "rewrite_ab"
 path = "examples/rewrite_ab.rs"
 required-features = ["desktop"]
 
-# E36a: a fresh migrated store for the MCP conformance suite's throwaway sidecar
-# (`packages/conformance/scripts/run-local.mjs`); `shogun-api` itself never creates one (#800).
-[[example]]
-name = "conformance_store"
-path = "examples/conformance_store.rs"
-required-features = ["db"]
-
 [[example]]
 name = "maya_handoff"
 path = "examples/maya_handoff.rs"
