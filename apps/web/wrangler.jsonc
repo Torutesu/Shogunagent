@@ -1,16 +1,15 @@
-// The website (apps/web) as a Cloudflare Worker with static assets. Build first: `node build.mjs`
-// writes `dist/`, which is uploaded as the assets. Deploy only through the manual deploy workflow
-// (.github/workflows/deploy.yml, component `web`), dry run by default.
-//
-// No route or custom domain here on purpose: a deploy publishes to the Worker's workers.dev
-// address only, so the new site can be checked before it replaces what shogunagent.com serves
-// today. Pointing shogunagent.com at this Worker is a separate owner step after that check, with
-// the current site's hosting kept for rollback (apps/web/README.md, "Deploy").
+// Production website. Cloudflare Workers Builds deploys main after web tests pass.
+// Only these two website domains belong to this Worker; API services are separate.
 {
   "name": "shogunagent-web",
   "main": "worker.mjs",
   "compatibility_date": "2026-03-01",
-  "workers_dev": true,
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    { "pattern": "shogunagent.com", "custom_domain": true },
+    { "pattern": "www.shogunagent.com", "custom_domain": true }
+  ],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
