@@ -70,7 +70,7 @@ The supporting pages cover product, demos, integrations, documentation, pricing,
 
 Production is the `shogunagent-web` Worker, serving `shogunagent.com` and `www.shogunagent.com`. Its domain mappings are declared in `wrangler.jsonc`; no API Worker or domain is part of this deployment.
 
-Cloudflare Workers Builds is connected to `Torutesu/Shogunagent`, production branch **main**, repository root `/`. Pushes to main build and deploy the website automatically. Preview-branch builds are disabled.
+Cloudflare Workers Builds is connected to `Torutesu/Shogunagent`, production branch **main**, repository root `/`. Pushes to main build and deploy the website automatically. Preview-branch builds are disabled. The connection was enabled on 2026-11-06; the first publication restored the main-branch documentation pages as well as the homepage.
 
 - Build command: `pnpm --filter @shogun-ai/web typecheck && pnpm --filter @shogun-ai/web test` (the test script builds all pages first).
 - Deploy command: `pnpm --filter @shogun-ai/web exec wrangler deploy --config wrangler.jsonc`.
@@ -78,7 +78,7 @@ Cloudflare Workers Builds is connected to `Torutesu/Shogunagent`, production bra
 - Failed tests stop publication and leave the previous deployment active.
 - The existing GitHub Actions manual deploy workflow remains available as a fallback; it does not run on pushes. Relay and router deployment policies are unchanged.
 
-Verify `/`, `/docs/quickstart/`, `/docs/agent-setup/`, `/llms.txt`, `/index.md`, a Markdown request to `/`, and a real 404 after publication. Compare the deployed homepage with `dist/index.html` from the deployed commit. Check the build's source SHA in Cloudflare.
+Verify `/`, `/docs/quickstart/`, `/docs/state-walkthrough/`, `/llms.txt`, `/index.md`, a Markdown request to `/`, and a real 404 after publication. Compare the deployed homepage with `dist/index.html` from the deployed commit. Check the build's source SHA in Cloudflare.
 
 Rollback: select the previous version in Cloudflare Deployments, then revert the faulty commit on main so the next automatic build keeps the correction. The pre-migration version is `c4cbff3b-444a-4337-9693-942359513bec` (2026-10-27).
 
