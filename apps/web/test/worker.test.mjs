@@ -61,7 +61,7 @@ test('unknown paths are real 404s and only GET and HEAD are served',async()=>{
   assert.equal(head.status,200);
 });
 
-test('wrangler.jsonc publishes dist/ with the assets settings the worker relies on, and no route',async()=>{
+test('wrangler.jsonc publishes dist/ with the assets settings the worker relies on, and only the production website domains',async()=>{
   const text=(await readFile(join(root,'wrangler.jsonc'),'utf8')).replace(/^\s*\/\/.*$/gm,'');
   const config=JSON.parse(text);
   assert.equal(config.main,'worker.mjs');
@@ -70,6 +70,8 @@ test('wrangler.jsonc publishes dist/ with the assets settings the worker relies 
   assert.equal(config.assets.not_found_handling,'404-page');
   assert.equal(config.assets.html_handling,'auto-trailing-slash');
   assert.equal(config.assets.run_worker_first,true);
-  assert.equal(config.routes,undefined,'attaching shogunagent.com is a separate, deliberate step');
+  assert.deepEqual(config.routes,[{pattern:'shogunagent.com',custom_domain:true},{pattern:'www.shogunagent.com',custom_domain:true}]);
+  assert.equal(config.workers_dev,false);
+  assert.equal(config.preview_urls,false);
   assert.equal(config.route,undefined);
 });

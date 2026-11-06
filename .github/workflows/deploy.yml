@@ -4,8 +4,9 @@ name: deploy
 # - Runs only when started by hand (workflow_dispatch) from main. Nothing deploys on push, tag or PR;
 #   scripts/check-workflow-yaml.py fails if this workflow gains another trigger.
 # - component: `relay` (apps/api, Worker `shogunai-relay`), `router` (apps/router, Worker
-#   `shogunagent-router`) or `web` (apps/web, the website Worker `shogunagent-web`; it has no route,
-#   so a deploy reaches its workers.dev address only until the owner attaches shogunagent.com). environment: `staging` or `production`, which is also the GitHub
+#   `shogunagent-router`) or `web` (apps/web, the production website Worker `shogunagent-web`).
+#   The website also deploys automatically through Cloudflare Workers Builds on main.
+#   environment: `staging` or `production`, which is also the GitHub
 #   environment the deploy job runs in: configure each with the owner as a required reviewer and
 #   `main` as the only deployment branch, so every run waits for an approval.
 # - Dry run by default: `wrangler deploy --dry-run` (bundle only, nothing uploaded) unless `confirm`
