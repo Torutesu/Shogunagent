@@ -15,8 +15,8 @@ Or `pnpm --filter @shogun-ai/web dev` (default port 3001).
 
 ## Edit and verify
 
-- `home.html`: preserved original shogunagent.com HTML, CSS and interactions, captured from the public site on 2026-10-28.
-- `build.mjs`: shared layout, supporting pages, and homepage additions.
+- `home.html`, `home.css`, `home.js`: homepage with a source-backed conversation example, three sample workflows, responsive navigation, and setup-prompt copying.
+- `build.mjs`: shared supporting-page layout, homepage setup component, and agent-readable references.
 - `laptop.html`, `laptop.css`, `laptop.js`: responsive local-workflow animation with manual chapters, pause/replay, visibility-aware playback, and reduced-motion support.
 - `content.mjs`: documentation, canonical local setup snippets.
 - `app.js`: synthetic handoff demos, navigation, docs filtering, clipboard.
@@ -37,7 +37,7 @@ node --check apps/web/content.mjs
 node --test apps/web/test/*.test.mjs
 ```
 
-Tests cover broken internal destinations, setup safety invariants, HTTP routes, content negotiation and 404 handling. Browser QA must cover the demo stages, scenario changes, empty source selection, JSON views, clipboard, responsive navigation and docs filtering.
+Tests cover broken internal destinations, setup safety invariants, HTTP routes, content negotiation and 404 handling. Browser QA must cover homepage scenario tabs (including keyboard navigation), source disclosure, setup clipboard, responsive navigation, and FAQ disclosure. The separate playground retains its demo stages, source selection, JSON views, and downloads; documentation retains filtering.
 
 ## Local onboarding beyond the website
 
@@ -56,7 +56,7 @@ See [VERIFICATION.md](VERIFICATION.md) for the completed browser/fresh-user audi
 
 ## Product truth and launch boundaries
 
-The original homepage identity is retained: white background, blue accents, Manrope, and the original black folded mark. Supporting pages use the same identity. The laptop uses the photographic MacBook frame from the user-provided ShogunAI reference. Its animated HTML screen illustrates remembering a launch note, answering a question, continuing with another agent and requesting approval. It is a conceptual interface, not a shipped desktop application.
+The homepage uses the original white background, blue accents, Manrope with serif emphasis, and the original black folded mark. Its three selectable examples pair fictional saved notes with a fresh conversation; they are illustrative, not live engine responses. The older laptop and graph assets remain in source but are no longer mounted on the homepage. Supporting pages retain their existing layout.
 
 The browser workspace is an illustrative product view, not a shipped dashboard or a connection to the engine. All demos are synthetic browser-only simulations; approvals never send externally. Sample downloads explicitly declare themselves illustrative subsets, not exact schema responses.
 
