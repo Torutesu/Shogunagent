@@ -7,6 +7,7 @@
   "pricing": [
     { "endpoint": "state.commitments.list", "model": "per_call", "cost_micro_usd": 0 },
     { "endpoint": "state.open_loops.list", "model": "per_call", "cost_micro_usd": 0 },
+    { "endpoint": "state.people.list", "model": "per_call", "cost_micro_usd": 0 },
     { "endpoint": "state.people.get", "model": "per_call", "cost_micro_usd": 0 },
     { "endpoint": "memory.recall", "model": "per_call", "cost_micro_usd": 0 },
     { "endpoint": "actions.execute", "model": "per_call", "cost_micro_usd": 2000 }

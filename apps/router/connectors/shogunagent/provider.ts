@@ -13,6 +13,7 @@ import { memoryRecall } from "./endpoints/memory.recall.js";
 import { stateCommitmentsList } from "./endpoints/state.commitments.list.js";
 import { stateOpenLoopsList } from "./endpoints/state.open_loops.list.js";
 import { statePeopleGet } from "./endpoints/state.people.get.js";
+import { statePeopleList } from "./endpoints/state.people.list.js";
 import manifest from "./provider.json" with { type: "json" };
 
 export const shogunagentProvider = defineProvider({
@@ -29,5 +30,5 @@ export const shogunagentProvider = defineProvider({
   manifest,
   categories: ["state"],
   health: { p50_ms: 40, p95_ms: 120, success_rate: 0.999 },
-  endpoints: [stateCommitmentsList, stateOpenLoopsList, statePeopleGet, memoryRecall, actionsExecute],
+  endpoints: [stateCommitmentsList, stateOpenLoopsList, statePeopleList, statePeopleGet, memoryRecall, actionsExecute],
 });

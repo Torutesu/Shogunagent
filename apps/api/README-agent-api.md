@@ -57,7 +57,7 @@ only local `shogun_e2e_*` databases, or its original disposable Unix-socket conf
 | GET | `/v1/receipts?since=&limit=` | `read` | Per-call receipts, oldest first |
 | POST | `/v1/receipts/{id}/dispute` | `write` | Open a dispute on a receipt (one per receipt) |
 | POST | `/v1/handoff` | `read` | An A2A state-of-work handoff for a task, assembled by the core (`handoff.create`) and relayed untouched (free; `docs/api/handoff.md`) |
-| GET | `/v1/state/commitments`, `/v1/state/open_loops`, `/v1/state/people/{person}` | `read` | Free state reads used by the router, relayed to the principal's core with query parameters intact; `person` is the core's numeric id |
+| GET | `/v1/state/commitments`, `/v1/state/open_loops`, `/v1/state/people`, `/v1/state/people/{person}` | `read` | Free state reads used by the router, relayed to the principal's core with query parameters intact; `person` is the core's numeric id (from `/v1/state/people`), and any other value is a 404 that never reaches the core |
 | POST | `/v1/memory/recall` | `read` | Free recall, with the MCP arguments as the body and the core's response relayed untouched |
 | GET, POST | `/v1/payments/mandates`, `/v1/payments/mandates/list` | `read` | `payments.mandates.list`, relayed to the core untouched (free; [payments](../../docs/api/payments.md)) |
 | POST | `/v1/payments/mandates/request`, `/v1/payments/mandates/revoke`, `/v1/payments/spend` | `run` | `payments.*` relayed to the core untouched: a new mandate and a payment outside one answer `202` with an approval URL for a human (free at the call) |

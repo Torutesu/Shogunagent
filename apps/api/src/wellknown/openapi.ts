@@ -14,7 +14,7 @@ import { DEFAULT_CAPS } from "../caps.js";
 import { FREE_ALLOWANCE_MICROS, MICRO_USD_PER_USD, RATE_MICROS, RUN_MARKUP_BPS } from "../pricing.js";
 import { DISPLAY_NAME, DOCS_URL, LONG_DESCRIPTION, PROVIDER, REPOSITORY_URL, VERSION, mcpUrl, origin, wellknownLinks, type WellknownContext } from "./identity.js";
 import { annotationsFor, type ToolTable } from "./tool-table.js";
-import { STATE_READ_ROUTES } from "../mcp-proxy.js";
+import { routePathTemplate, STATE_READ_ROUTES } from "../mcp-proxy.js";
 
 type Json = Record<string, unknown>;
 
@@ -410,7 +410,7 @@ function routes(table: ToolTable, ctx: WellknownContext): Route[] {
     // --- E51: payments.* relayed to the core (docs/api/payments.md) ---
     ...paymentRoutes(),
     ...STATE_READ_ROUTES.map((route): Route => ({
-      method: route.method, path: route.path.replace(":person", "{person}"), tag: "state", security: "key", scope: "read",
+      method: route.method, path: routePathTemplate(route.path).replace(":person", "{person}"), tag: "state", security: "key", scope: "read",
       summary: `${route.tool}: a free read from the caller's own state store.`,
       description: "Relayed to the principal's core without reading or storing bodies. The path pins the tool's free-read classification; caller-supplied MCP headers cannot change it.",
       ...(route.path.includes(":person") ? { parameters: [{ name: "person", in: "path", required: true, schema: { type: "integer", minimum: 1 }, description: "The core's numeric person id." }] } : {}),
@@ -494,7 +494,7 @@ function routes(table: ToolTable, ctx: WellknownContext): Route[] {
     // --- router verbs (apps/router, same base URL; plan §7.4 / §7.5) ---
     { method: "post", path: "/v1/router/discover", tag: "router", security: "none", servedBy: "apps/router", summary: "Find tools for a task, ranked by task fit × (price, health, latency) with the score breakdown. Free.", requestBody: jsonBody(ref("RouterDiscoverRequest")), responses: { "200": jsonBody(ref("RouterEnvelope")), "400": errorResponse("invalid_request") } },
     { method: "post", path: "/v1/router/inspect", tag: "router", security: "none", servedBy: "apps/router", summary: "One tool: schemas, price, live health, permission level, examples, cheaper alternatives. Free.", requestBody: jsonBody(ref("RouterInspectRequest")), responses: { "200": jsonBody(ref("RouterEnvelope")), "404": errorResponse("tool_not_found") } },
-    { method: "post", path: "/v1/router/run", tag: "router", security: "key", scope: "run", servedBy: "apps/router", summary: "Run a tool: L1 runs, L2 asks once (input_required), L3 returns an approval URL. Failures and empty results cost 0.", requestBody: jsonBody(ref("RouterRunRequest")), responses: { "200": jsonBody(ref("RouterEnvelope")), "400": errorResponse("invalid_input"), "401": errorResponse("authentication_required"), "402": errorResponse("payment_required"), "403": errorResponse("operation_denied"), "404": errorResponse("tool_not_found"), "409": errorResponse("idempotency_conflict"), "502": errorResponse("upstream_error ($0)"), "503": errorResponse("provider_unavailable") } },
+    { method: "post", path: "/v1/router/run", tag: "router", security: "key", scope: "run", servedBy: "apps/router", summary: "Run a tool: L1 runs, L2 asks once (input_required), L3 returns an approval URL. Failures and empty results cost 0.", requestBody: jsonBody(ref("RouterRunRequest")), responses: { "200": jsonBody(ref("RouterEnvelope")), "400": errorResponse("invalid_input"), "401": errorResponse("authentication_required"), "402": errorResponse("payment_required"), "403": errorResponse("operation_denied"), "404": errorResponse("tool_not_found | not_found (the provider found nothing for this input, $0)"), "409": errorResponse("idempotency_conflict"), "502": errorResponse("upstream_error ($0)"), "503": errorResponse("provider_unavailable") } },
     { method: "get", path: "/v1/router/catalog", tag: "router", security: "none", servedBy: "apps/router", summary: "The content-hashed catalog manifest.", responses: { "200": jsonBody({ type: "object" }) } },
     // --- E29: the open catalog (apps/router) and provider payouts ---
     { method: "get", path: "/v1/catalog", tag: "catalog", security: "none", servedBy: "apps/router", summary: "Every listed endpoint: price, live health and p50/p95, categories, first-party label, permission level, data-handling statement, and the published score formula. Free, no key.", parameters: [{ name: "category", in: "query", schema: { type: "string" } }, { name: "provider", in: "query", schema: { type: "string" } }, { name: "first_party", in: "query", schema: { type: "string", enum: ["true", "false"] } }], responses: { "200": jsonBody({ type: "object", properties: { format: { type: "string", enum: ["shogunagent-open-catalog/1"] }, catalog_hash: { type: "string" }, entry_count: { type: "integer" }, ranking: { type: "object" }, entries: { type: "array", items: { type: "object" } } } }) } },

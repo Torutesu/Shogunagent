@@ -32,7 +32,7 @@ describe("REST and MCP faces", () => {
     const health = await app.request("/health");
     expect(health.status).toBe(200);
     const cat = await app.request("/v1/router/catalog");
-    expect(((await cat.json()) as { entry_count: number }).entry_count).toBe(29);
+    expect(((await cat.json()) as { entry_count: number }).entry_count).toBe(30);
   });
 
   it("MCP tools/list exposes router.discover / inspect / run with generated schemas and annotations", async () => {

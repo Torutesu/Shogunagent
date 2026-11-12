@@ -373,6 +373,13 @@ export async function run(deps: RunDeps, call: RunCall): Promise<RunResult> {
     }
     const execLatency = now() - execStart;
     const failed = def.endpoint.output.isFailure ? def.endpoint.output.isFailure(response) : response.status >= 400;
+    if (failed && response.status === 404) {
+      // The provider answered: what the input names does not exist (an unknown id). The caller
+      // fixes the input; retrying the same call cannot help, and the provider is healthy.
+      await settle("provider_error", 0, 0);
+      deps.health.observe(toolId, { latency_ms: execLatency, ok: true });
+      return fail("not_found", "the provider found nothing for this input; check the identifiers it names; nothing was charged", "fix_input", "provider_error");
+    }
     if (failed) {
       await settle("provider_error", 0, 0);
       deps.health.observe(toolId, { latency_ms: execLatency, ok: false });

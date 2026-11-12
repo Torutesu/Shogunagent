@@ -12,7 +12,7 @@ describe("the router's first-party state reads through the hosted gateway", () =
     });
     const rig = makeAgentRig({ mcpUpstream: relay.upstream, mcpAdmit: relay.admit });
     const agent = await registerAgent(rig);
-    const paths = ["/v1/state/commitments?limit=2", "/v1/state/open_loops", "/v1/state/people/42"];
+    const paths = ["/v1/state/commitments?limit=2", "/v1/state/open_loops", "/v1/state/people?limit=5", "/v1/state/people/42"];
     for (const path of paths) {
       const reply = await authed(rig, agent.key, path, { headers: { "mcp-name": "memory.ingest", "mcp-quantity": "999" } });
       expect(reply.status, path).toBe(200);
@@ -31,10 +31,60 @@ describe("the router's first-party state reads through the hosted gateway", () =
 
   it("authenticates state reads before contacting the sidecar", async () => {
     const rig = makeAgentRig();
-    for (const path of ["/v1/state/commitments", "/v1/state/open_loops", "/v1/state/people/42"]) {
+    for (const path of ["/v1/state/commitments", "/v1/state/open_loops", "/v1/state/people", "/v1/state/people/42"]) {
       expect((await rig.app.request(path)).status, path).toBe(401);
     }
     expect((await rig.app.request("/v1/memory/recall", { method: "POST", body: "{}" })).status).toBe(401);
     expect(rig.upstreamCalls).toHaveLength(0);
+  });
+
+  it("takes only the core's numeric person ids and never relays a name", async () => {
+    const seen: string[] = [];
+    const relay = createMcpRelay({ url: "http://127.0.0.1:7464", bearerSecret: "local-test-sidecar-secret-32-characters" }, async (url) => {
+      seen.push(url);
+      return new Response('{"results":[]}', { headers: { "content-type": "application/json" } });
+    });
+    const rig = makeAgentRig({ mcpUpstream: relay.upstream, mcpAdmit: relay.admit });
+    const agent = await registerAgent(rig);
+    for (const path of ["/v1/state/people/Mika", "/v1/state/people/p_12"]) {
+      expect((await authed(rig, agent.key, path)).status, path).toBe(404);
+    }
+    expect(seen).toEqual([]);
+  });
+
+  it("answers a HEAD on a state read from the GET the core serves, without a body", async () => {
+    const seen: Array<{ url: string; method: string }> = [];
+    const relay = createMcpRelay({ url: "http://127.0.0.1:7464", bearerSecret: "local-test-sidecar-secret-32-characters" }, async (url, init) => {
+      seen.push({ url, method: init?.method ?? "GET" });
+      return new Response('{"results":[]}', { headers: { "content-type": "application/json" } });
+    });
+    const rig = makeAgentRig({ mcpUpstream: relay.upstream, mcpAdmit: relay.admit });
+    const agent = await registerAgent(rig);
+    for (const path of ["/v1/state/people", "/v1/state/commitments"]) {
+      const reply = await authed(rig, agent.key, path, { method: "HEAD" });
+      expect(reply.status, path).toBe(200);
+      expect(reply.headers.get("content-type"), path).toBe("application/json");
+      expect(await reply.text(), path).toBe("");
+    }
+    expect(seen).toEqual([
+      { url: "http://127.0.0.1:7464/v1/state/people", method: "GET" },
+      { url: "http://127.0.0.1:7464/v1/state/commitments", method: "GET" },
+    ]);
+  });
+
+  it("relays a percent-encoded person id to the core as the id the route matched", async () => {
+    const seen: string[] = [];
+    const relay = createMcpRelay({ url: "http://127.0.0.1:7464", bearerSecret: "local-test-sidecar-secret-32-characters" }, async (url) => {
+      seen.push(url);
+      return new Response('{"results":[]}', { headers: { "content-type": "application/json" } });
+    });
+    const rig = makeAgentRig({ mcpUpstream: relay.upstream, mcpAdmit: relay.admit });
+    const agent = await registerAgent(rig);
+    expect((await authed(rig, agent.key, "/v1/state/people/%34%32")).status).toBe(200);
+    // Encoded letters or slashes are still not a person id.
+    for (const path of ["/v1/state/people/%4Dika", "/v1/state/people/4%2F2"]) {
+      expect((await authed(rig, agent.key, path)).status, path).toBe(404);
+    }
+    expect(seen).toEqual(["http://127.0.0.1:7464/v1/state/people/42"]);
   });
 });
