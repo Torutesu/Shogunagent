@@ -50,6 +50,7 @@ pnpm install && pnpm --filter @shogun-ai/api typecheck && pnpm --filter @shogun-
 ```
 crates/            Rust workspace (engine, MCP/REST/CLI, evals). See docs/MIGRATION.md.
 apps/api/          Gateway and relay (Hono on Cloudflare Workers + Postgres).
+apps/video/        Launch film and explainer videos as HTML compositions (render with scripts/render.mjs).
 packages/config/   Shared config (license public key).
 scripts/           Invariant guards and the feature-matrix runner.
 docs/              implementation-plan.md, MIGRATION.md, migrations/ (rollbacks), mcp/, shogunai-origin/ (reference).

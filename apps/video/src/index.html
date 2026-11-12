@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ShogunAgent video compositions</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="stage" class="stage"></div>
+<div id="controls" hidden>
+  <select id="pick-video"></select>
+  <select id="pick-lang"><option value="en">English</option><option value="ja">日本語</option></select>
+  <button id="toggle" type="button">Pause</button>
+  <input id="scrub" type="range" min="0" max="1" step="0.001" value="0">
+  <output id="clock"></output>
+</div>
+<script type="module">
+import { build } from './engine.js';
+import { VIDEOS } from './videos.js';
+
+const params = new URLSearchParams(location.search);
+const stage = document.getElementById('stage');
+let comp = null;
+
+// The renderer calls these three; the preview controls below use the same path.
+window.__load = async (videoId, lang) => {
+  comp = build(stage, videoId, lang);
+  await document.fonts.ready;
+  await Promise.all([...document.fonts].map((face) => face.load().catch(() => null)));
+  comp.fit();
+  comp.seek(0);
+  return { duration: comp.duration, fps: comp.fps, scenes: comp.scenes.map((s) => ({ id: s.def.id, start: s.start, end: s.end })) };
+};
+window.__seek = (t) => comp.seek(t);
+
+if (!params.has('render')) {
+  // Interactive preview: scales the 1920×1080 stage to the window and plays it.
+  const controls = document.getElementById('controls');
+  const pickVideo = document.getElementById('pick-video');
+  const pickLang = document.getElementById('pick-lang');
+  const scrub = document.getElementById('scrub');
+  const clock = document.getElementById('clock');
+  const toggle = document.getElementById('toggle');
+  controls.hidden = false;
+  document.body.classList.add('preview');
+  pickVideo.innerHTML = VIDEOS.map((v) => `<option value="${v.id}">${v.file}</option>`).join('');
+  pickVideo.value = params.get('video') || 'launch';
+  pickLang.value = params.get('lang') || 'en';
+  let time = Number(params.get('t') || 0);
+  let playing = !params.has('t');
+  let last = null;
+  const fit = () => { stage.style.scale = String(Math.min(innerWidth / 1920, (innerHeight - 56) / 1080)); };
+  addEventListener('resize', fit);
+  fit();
+  const load = async () => { await window.__load(pickVideo.value, pickLang.value); time = Math.min(time, comp.duration); };
+  pickVideo.onchange = () => { time = 0; load(); };
+  pickLang.onchange = load;
+  toggle.onclick = () => { playing = !playing; toggle.textContent = playing ? 'Pause' : 'Play'; };
+  scrub.oninput = () => { time = Number(scrub.value) * comp.duration; };
+  await load();
+  const frame = (now) => {
+    if (playing && last !== null) time = (time + (now - last) / 1000) % comp.duration;
+    last = now;
+    comp.seek(time);
+    if (document.activeElement !== scrub) scrub.value = String(time / comp.duration);
+    clock.textContent = `${time.toFixed(1)} / ${comp.duration.toFixed(1)} s`;
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+}
+</script>
+</body>
+</html>
