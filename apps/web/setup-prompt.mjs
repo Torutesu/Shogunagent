@@ -34,10 +34,3 @@ ${memoryInstructions}
 
 7. Finish with a short checklist: server status and restart command, client and instruction files changed, actual tool calls and source IDs, fresh-session verification, optional second-client status, and anything still pending. Basic source saving and recall do not require a Batch relay. Do not claim automatic facts/entities extraction or a typed handoff was verified by this test; those are separate capabilities. Never publish or send anything externally as part of setup.`;
 }
-
-// Keep copied instructions on the preview's origin rather than sending local
-// users to a production deployment that may not contain these guides yet.
-if (typeof document !== 'undefined') {
-  const button = document.querySelector('[data-setup-prompt]');
-  if (button) button.dataset.copy = setupPrompt(window.location.origin);
-}

@@ -17,17 +17,15 @@ Or `pnpm --filter @shogun-ai/web dev` (default port 3001).
 
 - `home.html`, `home.css`, `home.js`: homepage with a source-backed conversation example, three sample workflows, responsive navigation, and setup-prompt copying.
 - `build.mjs`: shared supporting-page layout, homepage setup component, and agent-readable references.
-- `laptop.html`, `laptop.css`, `laptop.js`: responsive local-workflow animation with manual chapters, pause/replay, visibility-aware playback, and reduced-motion support.
 - `content.mjs`: documentation, canonical local setup snippets.
 - `app.js`: synthetic handoff demos, navigation, docs filtering, clipboard.
 - `onboarding.mjs`: source-only agent connection and state walkthrough pages.
 - `setup-prompt.mjs`: agent-neutral setup prompt and reusable project memory
-  instructions. The homepage copy button uses the current browser origin. The
+  instructions. The homepage copy button builds the prompt for the current browser origin; if clipboard access is denied it shows the prompt selected for manual copying. The
   preview server serves matching local links in `setup-prompt.txt` and the agent
   references; the static production build retains the public domain.
 - `styles.css`: responsive design and reduced-motion support.
-- `laptop.html`, `laptop.css`, `laptop.js`: photographic MacBook with a four-part, plain-language launch-review story.
-- `visuals.html`, `visuals.css`, `visuals.js`: interactive relationship graph and task timeline, with sample evidence, pause controls and reduced-motion support.
+- `connect.html`, `connect.css`: the homepage setup section. `build.mjs` swaps it in for `<section id="connect">` and fails if that marker is missing.
 - `assets/`: locally served brand and font assets.
 
 ```sh
@@ -56,7 +54,7 @@ See [VERIFICATION.md](VERIFICATION.md) for the completed browser/fresh-user audi
 
 ## Product truth and launch boundaries
 
-The homepage uses the original white background, blue accents, Manrope with serif emphasis, and the original black folded mark. Its three selectable examples pair fictional saved notes with a fresh conversation; they are illustrative, not live engine responses. The older laptop and graph assets remain in source but are no longer mounted on the homepage. Supporting pages retain their existing layout.
+The homepage uses the original white background, blue accents, Manrope with serif emphasis, and the original black folded mark. Its three selectable examples pair fictional saved notes with a fresh conversation; they are illustrative, not live engine responses. The earlier laptop animation and relationship graph were removed with the redesign; they remain in Git history. Supporting pages retain their existing layout.
 
 The browser workspace is an illustrative product view, not a shipped dashboard or a connection to the engine. All demos are synthetic browser-only simulations; approvals never send externally. Sample downloads explicitly declare themselves illustrative subsets, not exact schema responses.
 

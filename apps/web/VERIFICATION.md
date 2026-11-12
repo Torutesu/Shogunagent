@@ -7,10 +7,23 @@ Verified locally on 28 October 2026. This records observed behavior; it does not
 - All 18 content pages and the 404 document have valid local destinations: 574 links and fragment references checked.
 - All 44 generated pages/assets requested over HTTP returned successfully.
 - The three automated website tests passed: navigation/assets, quickstart safeguards, and HTTP routes/content negotiation/404/405 handling.
-- Browser checks covered the product and documentation routes, docs filtering and empty results, setup prompt copying, Human/Agent view, FAQ expansion, product tabs, MacBook chapters, relationship graph, timeline update/reset, and the homepage context-handoff animation.
+- Browser checks covered the product and documentation routes, docs filtering and empty results, setup prompt copying, Human/Agent view, FAQ expansion, product tabs, MacBook chapters, relationship graph, timeline update/reset, and the homepage context-handoff animation. (The Human/Agent view, MacBook chapters, relationship graph, timeline and handoff animation were removed from the homepage in the 8 November 2026 redesign; see the homepage section below.)
 - All three playground scenarios reached simulated approval. Empty source selection disables progression; reset, sample JSON rendering, and JSON download worked.
 - At a 390px viewport, mobile navigation opened, navigated to Get started, and closed. No horizontal overflow was observed.
 - Browser automation intermittently timed out; affected interactions were rechecked. A download-event wait timed out, but the generated JSON file was verified on disk. Observed browser console errors originated in the installed MetaMask extension.
+
+## Homepage after the redesign (12 November 2026)
+
+Verified locally in headless Chromium against `scripts/serve.mjs` after the 8 November redesign. All checks passed:
+
+- The setup section is injected at build time; `build.mjs` now fails if a homepage marker it rewrites is missing.
+- Scenario tabs: click selection, ArrowRight/Home keyboard navigation with focus following selection.
+- "From your saved project note" opens the source disclosure. FAQ items expand.
+- Setup prompt copy writes the prompt for the serving origin and confirms. With clipboard access denied, the prompt is shown in a selected text box and the failure message stays.
+- At a 390px viewport: the menu opens, closes on Escape and on navigation, and there is no horizontal overflow.
+- No page or console errors.
+
+The Human/Agent view no longer exists on the homepage; the agent-readable page is served at `/index.md`, `/llms.txt` and by content negotiation on `/` (covered by the automated tests).
 
 Run the website checks from the repository root:
 
@@ -64,7 +77,7 @@ separate from this source update. The earlier results above describe the initial
 - Added configuration generation for Claude Code, Cursor, Codex, and Claude Desktop,
   exact installation instructions, a no-model protocol check, and a tool-use prompt.
 - Added `/docs/state-walkthrough/`, the source processing guide, and the runnable
-  `maya_handoff` engine example. The laptop demo now links to this walkthrough.
+  `maya_handoff` engine example. The laptop demo linked to this walkthrough until it was removed in the 8 November 2026 homepage redesign.
 - Server initialization and discovery now describe ShogunAgent and processing
   prerequisites. The desktop-feature build retains the separate desktop guide.
 
