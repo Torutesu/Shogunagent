@@ -168,16 +168,31 @@ with ShogunAgent(base_url=sys.argv[1], api_key=os.environ['SHOGUN_E2E_KEY']) as 
   assert.equal((await wallet()).balance_micro_usd, after.balance_micro_usd);
   pass("encrypted state and ingest idempotency survive a sidecar restart");
 } finally {
+  // Every cleanup step runs even when an earlier one fails, so one bad close never leaves the
+  // sidecar, the disposable database or the temp stores behind. A cleanup failure is reported
+  // and fails the run, but is not thrown: that would hide the test's own error.
+  const cleanup = async (what: string, step: () => unknown) => {
+    try {
+      await step();
+    } catch (error) {
+      console.error(`cleanup failed (${what}):`, error);
+      process.exitCode = 1;
+    }
+  };
   for (const server of servers.reverse()) {
-    if ("closeAllConnections" in server) server.closeAllConnections();
-    await new Promise<void>((resolveClose, reject) => server.close((error) => error ? reject(error) : resolveClose()));
+    await cleanup("close a server", () => {
+      if ("closeAllConnections" in server) server.closeAllConnections();
+      return new Promise<void>((resolveClose, reject) => server.close((error) => error ? reject(error) : resolveClose()));
+    });
   }
-  await store?.close();
-  await stopSidecar();
+  await cleanup("close the store", () => store?.close());
+  await cleanup("stop the sidecar", stopSidecar);
   if (created) {
-    await admin.unsafe("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname=$1 AND pid<>pg_backend_pid()", [database]);
-    await admin.unsafe(`DROP DATABASE "${database}"`);
+    await cleanup("drop the database", async () => {
+      await admin.unsafe("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname=$1 AND pid<>pg_backend_pid()", [database]);
+      await admin.unsafe(`DROP DATABASE "${database}"`);
+    });
   }
-  await admin.end({ timeout: 2 });
-  await rm(root, { recursive: true, force: true });
+  await cleanup("close the admin connection", () => admin.end({ timeout: 2 }));
+  await cleanup("remove the temp stores", () => rm(root, { recursive: true, force: true }));
 }
