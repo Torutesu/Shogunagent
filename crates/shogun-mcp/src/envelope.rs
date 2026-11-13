@@ -28,9 +28,10 @@ pub fn read_usage() -> Value {
 }
 
 /// Whether `tool`'s successful answer carries the read envelope: the state reads and
-/// `profile.whoami`, on every face.
+/// `profile.whoami` and memory processing status, on every face.
 pub fn carries_read_envelope(tool: Tool) -> bool {
-    tool_level(tool) == ApiLevel::Read && (tool.wire_name().starts_with("state.") || tool == Tool::ProfileWhoami)
+    tool_level(tool) == ApiLevel::Read && (tool.wire_name().starts_with("state.")
+        || matches!(tool, Tool::ProfileWhoami | Tool::MemoryProcessingStatus))
 }
 
 /// The refusal code a JSON-RPC error code stands for, in REST's vocabulary.

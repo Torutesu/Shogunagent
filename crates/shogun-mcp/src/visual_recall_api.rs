@@ -114,7 +114,7 @@ pub fn render_structured(tool: Tool, json: &str) -> String {
     let result = serde_json::from_str::<serde_json::Value>(json)
         .unwrap_or_else(|_| serde_json::json!({ "error": "invalid_backend_response" }));
     // These answer flat, `{"tool", ...fields}`, not wrapped in `result`.
-    if matches!(tool, Tool::MemoryGetContext | Tool::MemoryGetEvents | Tool::MemoryReadSession) {
+    if matches!(tool, Tool::MemoryGetContext | Tool::MemoryGetEvents | Tool::MemoryReadSession | Tool::MemoryProcessingStatus) {
         if let serde_json::Value::Object(mut fields) = result {
             fields.insert("tool".into(), tool.wire_name().into());
             return serde_json::Value::Object(fields).to_string();
