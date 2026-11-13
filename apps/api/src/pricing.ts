@@ -54,7 +54,7 @@ export const TOOLS_CALL = "tools/call";
  * `discover` / `inspect`, which are free by the plan (§7.4). `state.*` matches by prefix. */
 export const FREE_TOOLS: ReadonlySet<string> = new Set([
   "memory.search", "memory.get_context", "memory.get_context_pack", "memory.get_events",
-  "memory.read_session", "memory.get_wrap", "memory.get_periods", "memory.recall",
+  "memory.read_session", "memory.get_wrap", "memory.get_periods", "memory.recall", "memory.processing_status",
   "calendar.upcoming", "profile.whoami", "wiki.evidence", "actions.status",
   "approvals.list", "approvals.get", "approvals.decide",
   "router.discover", "router.inspect",

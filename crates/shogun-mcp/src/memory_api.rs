@@ -122,6 +122,8 @@ pub enum Tool {
     /// assembly (facts + dated evidence) cut to `budget_tokens`, High facts as facts and Medium
     /// ones prefixed `possibly:`. A read; free (invariant 10).
     MemoryRecall,
+    /// Read processing progress for one source event without starting model work.
+    MemoryProcessingStatus,
     /// `/memories` as files (E6-T2): Anthropic's `memory_20250818` operations over the world-model
     /// projection and the caller's scratch files. Writes to the caller's scratch edit it; writes
     /// elsewhere become `memory.ingest` events. Local, L1.
@@ -498,6 +500,7 @@ pub const ALL_TOOLS: &[Tool] = &[
     Tool::MemoryIngest,
     Tool::MemoryIngestWebhook,
     Tool::MemoryRecall,
+    Tool::MemoryProcessingStatus,
     Tool::MemoryFs,
     Tool::HandoffCreate,
     Tool::HandoffAccept,
@@ -670,6 +673,7 @@ impl Tool {
             Tool::MemoryIngest => "memory.ingest",
             Tool::MemoryIngestWebhook => "memory.ingest_webhook",
             Tool::MemoryRecall => "memory.recall",
+            Tool::MemoryProcessingStatus => "memory.processing_status",
             Tool::MemoryFs => "memory.fs",
             Tool::HandoffCreate => "handoff.create",
             Tool::HandoffAccept => "handoff.accept",
@@ -872,6 +876,7 @@ pub fn tool_level(tool: Tool) -> ApiLevel {
         | Tool::CaptureExclusionsGet
         // A budgeted read of the context-pack assembly: nothing is written (E4-T3).
         | Tool::MemoryRecall
+        | Tool::MemoryProcessingStatus
         | Tool::ProfileWhoami => ApiLevel::Read,
         Tool::DictionaryAutoAddGet
         | Tool::VoiceDictionaryList
@@ -1214,6 +1219,7 @@ impl ToolGroup {
 /// someone picks its group, and nothing lands in [`ToolGroup::Core`] by default.
 pub fn tool_group(tool: Tool) -> ToolGroup {
     match tool {
+        Tool::MemoryProcessingStatus => ToolGroup::State,
         Tool::FormsInspect | Tool::FormsPlan | Tool::FormsStatus | Tool::FormsApply | Tool::FormsClose | Tool::FormsUndo => ToolGroup::Forms,
         // Core (plan §7.1, E4-T3): the frozen set. Reads, `memory.append_note`, `memory.ingest`,
         // `memory.recall` and `actions.execute` (per-action — the only route to an L3 send,
@@ -2727,6 +2733,7 @@ mod tests {
                         | Tool::MemoryGetEvents
                         | Tool::MemoryReadSession
                         | Tool::MemoryRecall
+                        | Tool::MemoryProcessingStatus
                         | Tool::HandoffCreate
                         | Tool::PaymentsMandatesList
                         | Tool::MemoryGetWrap

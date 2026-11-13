@@ -2787,6 +2787,7 @@ impl MemoryBackend for DbBackend {
             | Tool::MemoryReadSession
             | Tool::DeviceReleaseNotesGet
             | Tool::DreamStatus
+            | Tool::MemoryProcessingStatus
             | Tool::DreamRetry
             | Tool::LessonsList
             | Tool::StateDisputesList
@@ -3028,6 +3029,10 @@ impl MemoryBackend for DbBackend {
                 mark_dream_actions_app_only(&mut status);
                 status.to_string()
             }
+            Tool::MemoryProcessingStatus => match params.id.filter(|id| *id > 0) {
+                Some(id) => self.db.memory_processing_status(id, params.include_scratch).to_string(),
+                None => json!({"error":"invalid_event_id"}).to_string(),
+            },
             Tool::WritingVoiceGet => self.writing_voice_json(),
             Tool::DictionaryAutoAddGet => serde_json::to_string(&self.db.dictionary_autoadd_view().ok()?).ok()?,
             Tool::VisualRecallSearchFrames => self.visual_recall_search_json(params),

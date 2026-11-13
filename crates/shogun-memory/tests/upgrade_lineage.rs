@@ -153,6 +153,10 @@ fn assert_shipped_upgrade(release: &str, head: u32) -> TestResult {
     let conn = product_upgrade(&path)
         .unwrap_or_else(|e| panic!("{release} (V{head}) store fails the product upgrade: {e}"));
     assert_eq!(schema_version(&conn)?, Some(LATEST_SCHEMA_VERSION), "{release} (V{head})");
+    for table in ["event_processing_receipts", "event_processing_failures", "memory_processing_runtime"] {
+        let count: i64 = conn.query_row(&format!("SELECT count(*) FROM {table}"), [], |r| r.get(0))?;
+        assert_eq!(count, 0, "{release}: no fabricated processing history in {table}");
+    }
     let check: String = conn.query_row("PRAGMA quick_check", [], |r| r.get(0))?;
     assert_eq!(check, "ok", "{release} (V{head}): quick_check after upgrade");
     assert_eq!(seeded_rows(&conn)?, before, "{release} (V{head}): user rows changed by upgrade");
@@ -173,6 +177,11 @@ fn assert_shipped_upgrade(release: &str, head: u32) -> TestResult {
 #[test]
 fn upgrade_from_release_v0_2_0_schema_v41() -> TestResult {
     assert_shipped_upgrade("v0.2.0", 41)
+}
+
+#[test]
+fn v106_upgrade_preserves_sources_without_fabricating_processing_receipts() -> TestResult {
+    assert_shipped_upgrade("pre-processing-receipts", 106)
 }
 
 #[test]

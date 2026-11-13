@@ -2450,6 +2450,90 @@
         ]
       }
     },
+    "/v1/memory/processing/:id": {
+      "get": {
+        "tags": [
+          "state"
+        ],
+        "summary": "memory.processing_status: a free read from the caller's own state store.",
+        "description": "Relayed to the principal's core without reading or storing bodies. The path pins the tool's free-read classification; caller-supplied MCP headers cannot change it.",
+        "operationId": "get_v1_memory_processing_id",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "The core's REST response, relayed untouched."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid core arguments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "missing_key | invalid_key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "insufficient_scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Core unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "agentKey": [
+              "read"
+            ]
+          },
+          {
+            "oauth": [
+              "read"
+            ]
+          }
+        ]
+      }
+    },
     "/v1/ingest-hooks": {
       "post": {
         "tags": [

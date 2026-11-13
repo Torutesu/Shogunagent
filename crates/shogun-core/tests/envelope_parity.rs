@@ -37,7 +37,7 @@ fn clock() -> Clock {
 }
 
 /// A store with one person in it; returns their id.
-fn seeded() -> (Db, i64) {
+fn seeded() -> (Db, i64, i64) {
     use shogun_memory::state::{NewPerson, Provenance};
     let db = Db::open_in_memory(clock()).unwrap();
     let (event, _) = db
@@ -57,7 +57,7 @@ fn seeded() -> (Db, i64) {
     let id = db
         .insert_person(&NewPerson { display_name: "Aiko", confidence: 0.9, now: 1, ..Default::default() }, &[Provenance::new(event)])
         .unwrap();
-    (db, id)
+    (db, id, event)
 }
 
 /// Boot REST + `/mcp` on one listener. `locked` flips the plan for both faces.
@@ -156,10 +156,12 @@ fn same_on_three_faces(what: &str, mcp: &Value, rest: &Value, cli: &Value, expec
 
 #[test]
 fn the_three_faces_carry_the_same_envelope() {
-    let (db, person) = seeded();
+    let (db, person, event) = seeded();
     let locked = Arc::new(AtomicBool::new(false));
     let port = boot(db, locked.clone());
     let id = person.to_string();
+    let event_id = event.to_string();
+    let processing_path = format!("/v1/memory/processing/{event}");
     let read = json!({ "usage": { "unit": "read", "quantity": 1, "cost_micro_usd": 0 }, "latency_ms": "u64", "next_action": null });
     let refusal = |next: &str| json!({ "usage": "absent", "latency_ms": "absent", "next_action": next });
 
@@ -169,6 +171,7 @@ fn the_three_faces_carry_the_same_envelope() {
         ("state.people.list", json!({}), "/v1/state/people", vec!["people", "list"]),
         ("state.people.get", json!({ "id": person }), get_path.as_str(), vec!["people", "get", id.as_str()]),
         ("profile.whoami", json!({}), "/v1/profile/whoami", vec!["whoami"]),
+        ("memory.processing_status", json!({"id":event}), processing_path.as_str(), vec!["processing", "status", event_id.as_str()]),
     ] {
         let on_mcp = mcp(port, FULL, tool, args);
         let (status, on_rest) = curl(port, FULL, "GET", path, None);
@@ -188,7 +191,7 @@ fn the_three_faces_carry_the_same_envelope() {
         };
         assert_eq!(strip(on_rest.clone()), strip(on_cli.clone()), "{tool}: REST and CLI");
         assert_eq!(strip(on_mcp.clone()), strip(on_rest.clone()), "{tool}: the answer itself");
-        if tool != "profile.whoami" {
+        if tool.starts_with("state.") {
             assert!(on_rest.to_string().contains("Aiko"), "{tool}: {on_rest}");
         }
     }
@@ -199,6 +202,13 @@ fn the_three_faces_carry_the_same_envelope() {
     assert_eq!(status, 404, "{on_rest}");
     let (_, on_cli) = cli_raw(port, FULL, &["people", "get", "999999"]);
     same_on_three_faces("not found", &missing, &on_rest, &serde_json::from_str(&on_cli).unwrap(), refusal("fix_input"));
+
+    let missing = mcp(port, FULL, "memory.processing_status", json!({"id":999_999}));
+    let (status, on_rest) = curl(port, FULL, "GET", "/v1/memory/processing/999999", None);
+    assert_eq!(status, 404, "{on_rest}");
+    let (_, on_cli) = cli_raw(port, FULL, &["processing", "status", "999999"]);
+    same_on_three_faces("processing not found", &missing, &on_rest,
+        &serde_json::from_str(&on_cli).unwrap(), refusal("fix_input"));
 
     // A token that is not on the list: reauthenticate.
     let unknown = mcp(port, WRONG, "state.people.list", json!({}));

@@ -55,6 +55,16 @@ describe("redacting logger", () => {
     expect(all).not.toContain("SECRET-RESULT");
   });
 
+  it("hides event IDs and query strings on processing status reads", async () => {
+    const rig = makeAgentRig();
+    const agent = await registerAgent(rig);
+    await authed(rig, agent.key, "/v1/memory/processing/982734?include_scratch=true");
+    const log = rig.logLines.join("\n");
+    expect(log).toContain("GET /v1/memory/processing/:id");
+    expect(log).not.toContain("982734");
+    expect(log).not.toContain("include_scratch");
+  });
+
   it("never logs an agent key (E3-T1): registration, a metered call and a rejected key leave only a hashed key id", async () => {
     const rig = makeAgentRig();
     const reg = await registerAgent(rig);

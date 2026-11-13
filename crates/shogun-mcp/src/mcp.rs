@@ -2304,6 +2304,7 @@ fn tool_title(tool: Tool) -> &'static str {
         Tool::DeviceReleaseNotesGet => "Release notes",
         Tool::DeviceUpdateGet => "App update status",
         Tool::DreamStatus => "Nightly review status",
+        Tool::MemoryProcessingStatus => "Memory processing status",
         Tool::DreamRetry => "Retry the nightly review",
         Tool::CaptureStatus => "Capture status",
         Tool::CaptureSetPaused => "Pause or resume capture",
@@ -2431,6 +2432,7 @@ pub fn tool_descriptor(tool: Tool) -> Value {
         // The core descriptions come from `core_tools::CORE` below; these are the fallbacks.
         Tool::MemoryIngest => ("Append events or turns to the event log under an idempotency key (L1).", crate::ingest_api::ingest_schema()),
         Tool::MemoryRecall => ("What memory holds on a question, within a token budget.", crate::ingest_api::recall_schema()),
+        Tool::MemoryProcessingStatus => ("Use for: check whether one saved event has completed review and consolidation, or is pending or failed. Free read; never starts model work. Ready does not mean a fact was extracted. Excludes source text and inaccessible events.", json!({"id":{"type":"integer","minimum":1},"include_scratch":{"type":"boolean","default":false}})),
         Tool::MemoryIngestWebhook => (crate::webhook_ingest::DESCRIPTION, crate::webhook_ingest::schema()),
         Tool::MemoryFs => (crate::memfs_tool::DESCRIPTION, crate::memfs_tool::schema()),
         Tool::HandoffCreate => (crate::handoff_api::CREATE_DESCRIPTION, crate::handoff_api::create_schema()),
@@ -3051,6 +3053,10 @@ Records an item was linked to are not touched. Only delete what the user asked t
         "description": desc,
         "inputSchema": { "type": "object", "properties": props },
     });
+    if tool == Tool::MemoryProcessingStatus {
+        descriptor["inputSchema"]["required"] = json!(["id"]);
+        descriptor["inputSchema"]["additionalProperties"] = json!(false);
+    }
     if tool == Tool::MemoryNotesChange {
         descriptor["inputSchema"]["additionalProperties"] = json!(false);
         descriptor["inputSchema"]["oneOf"] = json!([

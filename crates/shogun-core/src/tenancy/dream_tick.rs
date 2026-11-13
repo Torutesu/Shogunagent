@@ -69,6 +69,8 @@ pub enum TickLane {
     Batch,
     /// The on-device local rules: no model, no egress.
     Local,
+    /// No lane could be selected safely; no work was consumed.
+    Unavailable,
 }
 
 /// One principal's line of a tick report.
@@ -105,19 +107,27 @@ pub fn plan_principal(db: &Db, now_ms: i64) -> Result<String, TickOutcome> {
     let new_material = from < to && db.has_batch_eligible_events(from, to);
     let unfinished = db
         .try_oldest_unfinished_hourly_cycle()
-        .map_err(|_| TickOutcome::Unavailable("ledger_unreadable"))?
-        .is_some();
-    let done_this_hour = db
+        .map_err(|_| TickOutcome::Unavailable("ledger_unreadable"))?;
+    let current = db
         .try_dream_cycle(&cycle_id)
-        .map_err(|_| TickOutcome::Unavailable("ledger_unreadable"))?
-        .is_some();
+        .map_err(|_| TickOutcome::Unavailable("ledger_unreadable"))?;
+    // Match prepare_full_cycle's selection: a new hour can make progress while an older
+    // pre-submission failure waits, but resuming that failed window must honor its durable
+    // backoff. Checking only the timer in the caller loses this protection after a restart.
+    let attempted_this_hour = unfinished.as_ref().is_some_and(|cycle| {
+        let new_window = cycle.provider_batch_id.is_none()
+            && cycle.failure_count >= 1
+            && cycle.cycle_id.as_str() < cycle_id.as_str()
+            && current.is_none();
+        !new_window && crate::dreamcycle::hourly::in_backoff(cycle.failure_count, cycle.updated_at, now_ms)
+    });
     let inputs = HourlyInputs {
         batch_provisioned: true,
         power_connected: true,
         battery_pct: 100,
-        done_this_hour,
-        attempted_this_hour: false,
-        unfinished_cycle: unfinished,
+        done_this_hour: current.is_some(),
+        attempted_this_hour,
+        unfinished_cycle: unfinished.is_some(),
         new_material,
         before_slot: false,
     };
@@ -167,7 +177,8 @@ pub async fn tick_principal_with_lane<B: BatchLane>(db: &Db, lane: &B, now_ms: i
         // With this hour's id already in the ledger, the next run resumes the oldest unfinished
         // hourly window (`prepare_full_cycle`): an older failed one, when one remains.
         match db.try_oldest_unfinished_hourly_cycle() {
-            Ok(Some(older)) if older.cycle_id.as_str() < cycle_id.as_str() => {}
+            Ok(Some(older)) if older.cycle_id.as_str() < cycle_id.as_str()
+                && !crate::dreamcycle::hourly::in_backoff(older.failure_count, older.updated_at, now_ms) => {}
             Ok(_) => break,
             Err(_) => return TickOutcome::Unavailable("ledger_unreadable"),
         }
@@ -276,6 +287,21 @@ where
     B: BatchLane,
     F: Fn(&PrincipalId, &Db) -> Option<B>,
 {
+    hourly_tick_checked(store, principals, |principal, db| Ok(lane_for(principal, db)), now_ms).await
+}
+
+/// Routed tick with explicit lane-selection failures. Credential/transport failures leave the
+/// ledger and pending events untouched; only an explicitly absent lane selects local rules.
+pub async fn hourly_tick_checked<B, F>(
+    store: &PrincipalStore,
+    principals: &[PrincipalId],
+    lane_for: F,
+    now_ms: i64,
+) -> Vec<PrincipalTick>
+where
+    B: BatchLane,
+    F: Fn(&PrincipalId, &Db) -> Result<Option<B>, &'static str>,
+{
     let mut report = Vec::with_capacity(principals.len());
     for principal in principals {
         let (outcome, lane, loops) = match store.open(principal) {
@@ -284,15 +310,26 @@ where
                 // the review and the next search see vectors for the material it reviews.
                 open.db().embed_pending(EMBED_BACKLOG_PER_TICK);
                 match lane_for(principal, open.db()) {
-                    Some(lane) => {
+                    Ok(Some(lane)) => {
                         let (outcome, loops) = tick_principal_batch(open.db(), &lane, now_ms).await;
                         (outcome, TickLane::Batch, loops)
                     }
                     // No Batch lane: the local rules, and never a consolidator call.
-                    None => (tick_principal_local(open.db(), now_ms), TickLane::Local, None),
+                    Ok(None) => {
+                        // A removed credential must not turn an unfinished paid review into a
+                        // completed local cycle. Keep its frozen inputs for recovery.
+                        match open.db().try_oldest_unfinished_hourly_cycle() {
+                            Ok(None) => (tick_principal_local(open.db(), now_ms), TickLane::Local, None),
+                            Ok(Some(cycle)) if cycle.batch_stage == shogun_memory::dream_cycles::BatchStage::Local =>
+                                (tick_principal_local(open.db(), now_ms), TickLane::Local, None),
+                            Ok(Some(_)) => (TickOutcome::Skipped("relay_required"), TickLane::Unavailable, None),
+                            Err(_) => (TickOutcome::Unavailable("ledger_unreadable"), TickLane::Unavailable, None),
+                        }
+                    }
+                    Err(code) => (TickOutcome::Unavailable(code), TickLane::Unavailable, None),
                 }
             }
-            Err(_) => (TickOutcome::Unavailable("store_unavailable"), TickLane::Local, None),
+            Err(_) => (TickOutcome::Unavailable("store_unavailable"), TickLane::Unavailable, None),
         };
         report.push(PrincipalTick { principal: principal.clone(), outcome, lane, loops });
     }
@@ -655,6 +692,110 @@ mod tests {
     fn consolidator_rows(db: &Db) -> Vec<shogun_memory::traceability::TraceRow> {
         let filter = shogun_memory::traceability::Filter { purpose: Some(shogun_memory::loops::PURPOSE.into()), ..Default::default() };
         db.traceability_sink().rows(&filter)
+    }
+
+    #[tokio::test]
+    async fn lane_selection_failure_does_not_consume_events_or_replace_an_unfinished_review() {
+        let now = 240 * 24 * HOUR + 10 * HOUR;
+        let root = TempRoot::new("lane_unavailable");
+        let store = store(&root, now);
+        let principal = PrincipalId::parse("alice").unwrap();
+        let open = store.open(&principal).unwrap();
+        ingest(open.db(), "credential-error", "I'll send Dana the rollout by Friday.", now - 2 * HOUR);
+        let report = hourly_tick_checked::<CountingLane, _>(&store, std::slice::from_ref(&principal),
+            |_, _| Err("credential_unavailable"), now).await;
+        assert_eq!(report[0].outcome, TickOutcome::Unavailable("credential_unavailable"));
+        assert!(open.db().try_last_consolidated_to().unwrap().is_none());
+        assert!(open.db().try_oldest_unfinished_hourly_cycle().unwrap().is_none());
+        tick_principal_with_lane(open.db(), &TracedLane::new(open.db(), true), now).await;
+        let report = hourly_tick_checked::<CountingLane, _>(&store, std::slice::from_ref(&principal),
+            |_, _| Ok(None), now + HOUR).await;
+        assert_eq!(report[0].outcome, TickOutcome::Skipped("relay_required"));
+        assert!(open.db().try_last_consolidated_to().unwrap().is_none());
+        assert!(open.db().try_oldest_unfinished_hourly_cycle().unwrap().is_some());
+    }
+
+    struct MalformedConsolidation(TracedLane);
+
+    impl BatchLane for MalformedConsolidation {
+        async fn review(&self, items: &[BatchItem]) -> Result<Vec<BatchResult>, LlmError> {
+            let mut results = self.0.review(items).await?;
+            if items.iter().any(|i| i.purpose == shogun_memory::loops::PURPOSE) {
+                for result in &mut results { result.text = Some("not valid JSON".into()); }
+            }
+            Ok(results)
+        }
+        fn synchronous_review(&self) -> bool { true }
+        async fn submit(&self, items: &[BatchItem], id: Option<&str>) -> Result<BatchHandle, LlmError> { self.0.submit(items, id).await }
+        async fn poll(&self, id: &str) -> Result<BatchHandle, LlmError> { self.0.poll(id).await }
+        async fn results(&self, id: &str) -> Result<Vec<BatchResult>, LlmError> { self.0.results(id).await }
+    }
+
+    #[tokio::test]
+    async fn malformed_consolidation_is_visible_and_retry_survives_restart() {
+        let now = crate::daemon::local_day_bounds(240 * 24 * HOUR).today_start_ms + 10 * HOUR;
+        let root = TempRoot::new("consolidation_retry");
+        let principal = PrincipalId::parse("alice").unwrap();
+        let event;
+        {
+            let store = store(&root, now);
+            let open = store.open(&principal).unwrap();
+            let request = shogun_mcp::ingest_api::ingest_request(&serde_json::json!({
+                "events":[{"content":"I'll send Dana the rollout report by Friday.", "ts_ms":now - HOUR}],
+                "source":"processing-test", "actor":"agent:alice", "thread_key":"t", "idempotency_key":"malformed-consolidation",
+            })).unwrap();
+            event = open.db().agent_ingest(&request).unwrap().event_ids[0];
+            assert_eq!(open.db().memory_processing_status(event, false)["state"], "pending");
+            let lane = MalformedConsolidation(TracedLane::new(open.db(), false));
+            let (outcome, applied) = tick_principal_batch(open.db(), &lane, now).await;
+            assert_eq!(outcome, TickOutcome::Ran { complete: true });
+            assert!(applied.is_none());
+            let status = open.db().memory_processing_status(event, false);
+            assert_eq!(status["state"], "failed", "{status}");
+            assert_eq!(status["reason"], "consolidation_output");
+            assert_eq!(status["stage"], "consolidation");
+        }
+        let store = store(&root, now + HOUR);
+        let open = store.open(&principal).unwrap();
+        assert_eq!(open.db().memory_processing_status(event, false)["state"], "failed");
+        let lane = TracedLane::new(open.db(), false);
+        let (_, applied) = tick_principal_batch(open.db(), &lane, now + HOUR).await;
+        assert!(applied.is_some(), "unread signals were preserved");
+        let status = open.db().memory_processing_status(event, false);
+        assert_eq!(status["state"], "ready", "{status}");
+        assert_eq!(lane.purposes(), vec![shogun_memory::loops::PURPOSE]);
+        assert!(open.db().commitment_rows().iter().any(|r| r.description.contains("rollout report") && r.confidence >= 0.84));
+    }
+
+    #[tokio::test]
+    async fn failed_window_backoff_survives_reopening_and_preserves_the_next_hour() {
+        let now = crate::daemon::local_day_bounds(240 * 24 * HOUR).today_start_ms + 10 * HOUR + 58 * 60_000;
+        let root = TempRoot::new("durable_backoff");
+        let principal = PrincipalId::parse("alice").unwrap();
+        {
+            let store = store(&root, now);
+            let open = store.open(&principal).unwrap();
+            let db = open.db();
+            ingest(db, "backoff", "I'll send the report to Dana by Friday.", now - HOUR);
+            let failed = tick_principal_with_lane(db, &TracedLane::new(db, true), now).await;
+            assert_eq!(failed, TickOutcome::Failed("batch_lane"));
+            let cycle = db.try_oldest_unfinished_hourly_cycle().unwrap().unwrap();
+            assert_eq!(cycle.failure_count, 1);
+        }
+        let store = store(&root, now);
+        let open = store.open(&principal).unwrap();
+        let db = open.db();
+        let lane = TracedLane::new(db, false);
+        assert_eq!(tick_principal_with_lane(db, &lane, now + 60_000).await,
+            TickOutcome::Skipped("already_attempted"));
+        assert!(lane.purposes().is_empty());
+        assert!(plan_principal(db, now + 5 * 60_000).is_ok(), "retry at the boundary");
+        // A fresh hour remains eligible even when an older failed window is in backoff.
+        let next = now + 2 * 60_000;
+        assert!(plan_principal(db, next).is_ok());
+        assert_eq!(tick_principal_with_lane(db, &lane, now + 5 * 60_000).await,
+            TickOutcome::Ran { complete: true });
+        assert!(db.try_oldest_unfinished_hourly_cycle().unwrap().is_none());
     }
 
     /// E49: on the Batch lane, a review that produced signals is followed by one consolidator call

@@ -12,7 +12,7 @@ describe("the router's first-party state reads through the hosted gateway", () =
     });
     const rig = makeAgentRig({ mcpUpstream: relay.upstream, mcpAdmit: relay.admit });
     const agent = await registerAgent(rig);
-    const paths = ["/v1/state/commitments?limit=2", "/v1/state/open_loops", "/v1/state/people/42"];
+    const paths = ["/v1/state/commitments?limit=2", "/v1/state/open_loops", "/v1/state/people/42", "/v1/memory/processing/42?include_scratch=true", "/v1/memory/processing/not-an-id"];
     for (const path of paths) {
       const reply = await authed(rig, agent.key, path, { headers: { "mcp-name": "memory.ingest", "mcp-quantity": "999" } });
       expect(reply.status, path).toBe(200);
@@ -31,7 +31,7 @@ describe("the router's first-party state reads through the hosted gateway", () =
 
   it("authenticates state reads before contacting the sidecar", async () => {
     const rig = makeAgentRig();
-    for (const path of ["/v1/state/commitments", "/v1/state/open_loops", "/v1/state/people/42"]) {
+    for (const path of ["/v1/state/commitments", "/v1/state/open_loops", "/v1/state/people/42", "/v1/memory/processing/42"]) {
       expect((await rig.app.request(path)).status, path).toBe(401);
     }
     expect((await rig.app.request("/v1/memory/recall", { method: "POST", body: "{}" })).status).toBe(401);

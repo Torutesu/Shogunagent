@@ -73,6 +73,7 @@ mod meetings;
 mod export_v1;
 mod governance;
 mod payments;
+mod processing;
 mod memory_fs;
 mod memory_import;
 mod memory_notes;

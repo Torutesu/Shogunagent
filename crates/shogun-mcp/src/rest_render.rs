@@ -287,7 +287,7 @@ fn structured_read_status(json: &str) -> u16 {
             let err = v.get("error").and_then(|e| e.as_str());
             match err {
                 Some("not_found") | Some("missing_frame_id") => 404,
-                Some("meeting_history_unavailable" | "evidence_unavailable" | "neighbors_unavailable" | "knowledge_unavailable") => 503,
+                Some("meeting_history_unavailable" | "evidence_unavailable" | "neighbors_unavailable" | "knowledge_unavailable" | "processing_unavailable") => 503,
                 Some(_) => 400,
                 None => 200,
             }

@@ -9,9 +9,9 @@
 //! - [`local_store`]: `<SHOGUN_TOKEN_STORE_DIR | <root>/.tokens>` sealed with that key. The
 //!   leading dot keeps the directory out of [`super::dream_tick::principals_on_disk`] (it is not a
 //!   valid principal id).
-//! - [`relay_bearer`]: the Batch relay bearer a principal's hourly Dream Cycle presents, if one is
-//!   configured; a store failure reads as "none", so the tick falls back to the local rules
-//!   instead of sending anything.
+//! - [`try_relay_bearer`]: the Batch relay bearer a principal's hourly Dream Cycle presents,
+//!   distinguishing an absent credential from a storage error so processing fails closed.
+//!   [`relay_bearer`] remains a compatibility lookup that collapses either case to `None`.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -59,12 +59,16 @@ pub fn local_store(dir: PathBuf, keys: Arc<dyn KeyProvider>) -> FileSealedTokenS
 }
 
 /// The relay bearer configured for `principal`, if any. Absent, empty, locked or unreadable all
-/// answer `None`: without a usable credential the tick reviews locally and sends nothing.
+/// answer `None`. Processing uses [`try_relay_bearer`] to distinguish storage failure from absence.
 pub fn relay_bearer(store: &dyn TokenStore, principal: &PrincipalId) -> Option<LicenseBearer> {
-    match store.get(principal.as_str(), CredentialSlot::BatchRelay) {
-        Ok(Some(secret)) if !secret.is_empty() => Some(LicenseBearer::new(secret)),
-        _ => None,
-    }
+    try_relay_bearer(store, principal).ok().flatten()
+}
+
+/// Processing must distinguish an absent credential from a locked or corrupt store. A storage
+/// failure must never consume pending model work using local rules instead.
+pub fn try_relay_bearer(store: &dyn TokenStore, principal: &PrincipalId) -> Result<Option<LicenseBearer>, TokenStoreError> {
+    Ok(store.get(principal.as_str(), CredentialSlot::BatchRelay)?
+        .filter(|secret| !secret.is_empty()).map(LicenseBearer::new))
 }
 
 #[cfg(test)]
@@ -94,6 +98,7 @@ mod tests {
         // Sealed under alice's key: a store that resolves another key for her cannot open it,
         // and that reads as "no bearer" (local fallback), not as an error that sends anything.
         let other: Arc<dyn KeyProvider> = Arc::new(EnvKeyProvider::with_default(DbKey::new([3; 32])));
+        assert!(try_relay_bearer(&local_store(dir.clone(), other.clone()), &alice).is_err());
         assert!(relay_bearer(&local_store(dir.clone(), other), &alice).is_none());
 
         // An empty value is not a credential.
