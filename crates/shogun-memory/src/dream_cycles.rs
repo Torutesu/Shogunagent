@@ -789,6 +789,19 @@ pub fn mark_complete(
     now: i64,
 ) -> Result<(), rusqlite::Error> {
     let tx = conn.transaction()?;
+    // Capture the lane before completion replaces batch_stage. Receipts and completion commit
+    // together; a lost lease rolls the receipts back too. Explicitly deleted inputs get none.
+    tx.execute(
+        "INSERT INTO event_processing_receipts (event_id, arrival_seq, reviewed_at, lane)
+         SELECT i.event_id, i.arrival_seq, ?2,
+                CASE WHEN c.batch_stage = 'local' THEN 'local' ELSE 'batch' END
+         FROM dream_cycle_inputs i JOIN dream_cycles c ON c.cycle_id = i.cycle_id
+         JOIN event_log e ON e.id = i.event_id
+         WHERE i.cycle_id = ?1 AND i.disposition = 'active'
+         ON CONFLICT(event_id) DO UPDATE SET arrival_seq = excluded.arrival_seq,
+             reviewed_at = excluded.reviewed_at, lane = excluded.lane",
+        params![cycle_id, now],
+    )?;
     let changed = tx.execute(
         "UPDATE dream_cycles
          SET status = 'done', batch_stage = 'complete', run_owner = NULL,

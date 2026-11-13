@@ -137,6 +137,16 @@ fn unread_outcomes() -> String {
     )
 }
 
+/// Whether this event has inputs the consolidator can still consume. Use the same eligibility
+/// rules as scheduling so an outcome for an already closed or hidden row cannot remain pending.
+pub fn has_unread_for_event(conn: &Connection, event_id: i64) -> Result<bool, rusqlite::Error> {
+    conn.query_row(&format!(
+        "SELECT EXISTS(SELECT 1 FROM {} WHERE s.event_id = ?1 AND {UNREAD})
+         OR EXISTS(SELECT 1 FROM {} AND u.event_id = ?1)",
+        eligible_signals(), unread_outcomes(),
+    ), [event_id], |r| r.get(0))
+}
+
 /// Outcomes one call carries.
 const MAX_OUTCOMES: usize = 20;
 
@@ -582,7 +592,7 @@ fn loop_kind(conn: &Connection, kind: &str, event_id: i64) -> Result<&'static st
 
 /// One `open` item: re-list (by id, or by the same text) or store a new row. `Some(true)` =
 /// re-listed, `Some(false)` = new, `None` = refused.
-fn open_item(conn: &mut Connection, item: &Value, events: &[i64], now: i64, ctx: &crate::actor::WriteContext) -> Result<Option<bool>, rusqlite::Error> {
+fn open_item(conn: &mut rusqlite::Savepoint<'_>, item: &Value, events: &[i64], now: i64, ctx: &crate::actor::WriteContext) -> Result<Option<bool>, rusqlite::Error> {
     let confidence = item.get("confidence").and_then(Value::as_f64).unwrap_or(0.0);
     let (Some(kind), Some(horizon), Some(text)) = (str_of(item, "kind"), str_of(item, "horizon"), str_of(item, "text")) else {
         return Ok(None);
@@ -686,7 +696,7 @@ fn open_item(conn: &mut Connection, item: &Value, events: &[i64], now: i64, ctx:
 }
 
 /// One `resolved` entry: closes an open row the user did not pin, with the quote that shows it.
-fn resolve(conn: &mut Connection, r: &Value, events: &[i64], now: i64) -> Result<bool, rusqlite::Error> {
+fn resolve(conn: &mut rusqlite::Savepoint<'_>, r: &Value, events: &[i64], now: i64) -> Result<bool, rusqlite::Error> {
     let Some((table, id)) = str_of(r, "id").and_then(row_ref) else { return Ok(false) };
     if open_row(conn, table, id)?.map_or(true, |(pinned, _)| pinned) {
         return Ok(false);
@@ -706,7 +716,7 @@ fn resolve(conn: &mut Connection, r: &Value, events: &[i64], now: i64) -> Result
 /// One `duplicates` entry: folds an open, unpinned row into another open row of the same table.
 /// The duplicate is kept (`merged_into`, status cancelled / closed); its evidence is copied to the
 /// target so the target holds the union.
-fn merge(conn: &mut Connection, d: &Value, now: i64) -> Result<bool, rusqlite::Error> {
+fn merge(conn: &mut rusqlite::Savepoint<'_>, d: &Value, now: i64) -> Result<bool, rusqlite::Error> {
     let (Some((table, id)), Some((into_table, into))) =
         (str_of(d, "id").and_then(row_ref), str_of(d, "into_id").and_then(row_ref))
     else {
@@ -756,6 +766,10 @@ pub fn apply(conn: &mut Connection, answer: &Value, events: &[i64], read: &[i64]
 /// as its last writer and lands in `ctx.namespace`. The engine passes
 /// [`crate::actor::Actor::system`]`("consolidator")`.
 pub fn apply_as(conn: &mut Connection, answer: &Value, events: &[i64], read: &[i64], now: i64, ctx: &crate::actor::WriteContext) -> Result<Applied, MemoryError> {
+    // State effects and acknowledging their inputs are one commit. A storage failure leaves
+    // both untouched so a later processing retry cannot observe a half-applied answer.
+    let mut savepoint = conn.savepoint()?;
+    let conn = &mut savepoint;
     let list = |key: &str| answer.get(key).and_then(Value::as_array).cloned().unwrap_or_default();
     let mut out = Applied::default();
     let open = list("open");
@@ -774,6 +788,7 @@ pub fn apply_as(conn: &mut Connection, answer: &Value, events: &[i64], read: &[i
         if merge(conn, d, now)? { out.merged += 1 } else { out.dropped += 1 }
     }
     mark_read(conn, read, now)?;
+    savepoint.commit()?;
     Ok(out)
 }
 
@@ -904,6 +919,23 @@ mod tests {
             params![ts, PURPOSE],
         )
         .unwrap();
+    }
+
+    #[test]
+    fn storage_failure_rolls_back_state_effects_and_input_acknowledgement() {
+        let mut conn = crate::open_in_memory().unwrap();
+        let ev = event(&conn, "atomic", NOW, SAID);
+        record_signals(&conn, "w1", &[signal(ev, "question", "deck", "can you send me the launch deck")], NOW).unwrap();
+        let read: i64 = conn.query_row("SELECT id FROM loop_signals LIMIT 1", [], |r| r.get(0)).unwrap();
+        conn.execute_batch("CREATE TEMP TRIGGER reject_processing_ack BEFORE INSERT ON loop_signal_reads BEGIN SELECT RAISE(ABORT, 'injected storage failure'); END;").unwrap();
+        let answer = json!({"open":[item(ev, "can you send me the launch deck", 0.9)], "resolved":[], "duplicates":[]});
+        assert!(apply(&mut conn, &answer, &[ev], &[read], NOW).is_err());
+        assert_eq!(count(&conn, "SELECT count(*) FROM open_loops"), 0);
+        assert_eq!(count(&conn, "SELECT count(*) FROM state_provenance"), 0);
+        assert_eq!(count(&conn, "SELECT count(*) FROM loop_signal_reads"), 0);
+        conn.execute_batch("DROP TRIGGER reject_processing_ack").unwrap();
+        assert_eq!(apply(&mut conn, &answer, &[ev], &[read], NOW).unwrap().opened, 1);
+        assert_eq!(count(&conn, "SELECT count(*) FROM loop_signal_reads"), 1);
     }
 
     #[test]

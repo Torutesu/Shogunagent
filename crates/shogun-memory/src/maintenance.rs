@@ -535,6 +535,7 @@ pub fn delete_all(conn: &mut Connection) -> Result<DeleteReport, rusqlite::Error
     // Full reset intentionally terminates unfinished Dream work and removes its temporary input
     // pins before canonical events are deleted.
     tx.execute("DELETE FROM dream_cycles", [])?;
+    tx.execute("DELETE FROM memory_processing_runtime", [])?;
     tx.execute("DELETE FROM about_profile_generation", [])?;
     tx.execute("DELETE FROM daily_activity_summary_jobs", [])?;
     tx.execute("DELETE FROM brief_generation", [])?;
@@ -2804,6 +2805,8 @@ mod tests {
         ];
         // Emptied by ON DELETE CASCADE from a wiped parent, or by a trigger on one.
         const CASCADED: &[&str] = &[
+            "event_processing_receipts",
+            "event_processing_failures",
             "dream_batch_items",
             "dream_brief_effects",
             "dream_cycle_inputs",
@@ -2859,6 +2862,11 @@ mod tests {
         conn.execute_batch(
             "INSERT INTO relay_attempts (fingerprint, request_id) VALUES ('fp', 'req');
              INSERT INTO dream_event_arrivals (event_id) VALUES (1);
+             INSERT INTO event_processing_receipts (event_id, arrival_seq, reviewed_at, lane)
+                 SELECT id, 1, 100, 'batch' FROM event_log LIMIT 1;
+             INSERT INTO event_processing_failures (event_id, failed_at, code)
+                 SELECT id, 100, 'consolidation_output' FROM event_log LIMIT 1;
+             INSERT INTO memory_processing_runtime VALUES (1, 100, 60000, 'review_complete');
              INSERT INTO state_suppressions (state_table, match_digest, reason, suppressed_at)
              VALUES ('commitments', 'legacy-digest', 'deleted', 100);
              INSERT INTO state_suppressions_scoped (state_table, namespace, match_digest, reason, suppressed_at)
@@ -2869,7 +2877,8 @@ mod tests {
             .query_row("SELECT key FROM dictionary_autoadd_secret WHERE id = 1", [], |r| r.get(0))
             .unwrap();
         delete_all(&mut conn).unwrap();
-        for table in ["llm_usage", "relay_attempts", "dream_event_arrivals", "state_suppressions", "state_suppressions_scoped"] {
+        for table in ["llm_usage", "relay_attempts", "dream_event_arrivals", "state_suppressions", "state_suppressions_scoped",
+            "event_processing_receipts", "event_processing_failures", "memory_processing_runtime"] {
             let n: i64 = conn.query_row(&format!("SELECT count(*) FROM {table}"), [], |r| r.get(0)).unwrap();
             assert_eq!(n, 0, "{table} should be empty after delete_all");
         }

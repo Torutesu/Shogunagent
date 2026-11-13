@@ -9,6 +9,13 @@ we run it ourselves per region:
 | `compose/` | `docker-compose.yml` for a single host: sidecar + gateway + Postgres, with `.env.example` and the gateway's `Dockerfile` |
 | `check.sh` | The validation CI runs (`.github/workflows/deploy-check.yml`): `helm lint`, `helm template` + kubeconform for the defaults and every `helm/shogunagent/ci/*.yaml`, the settings the chart must refuse, and `docker compose config` |
 
+## Automatic memory processing
+
+The sidecar can run review and consolidation continuously with
+`SHOGUN_PROCESSING_INTERVAL_SECS=60` (default `0`, disabled). Provision each principal's relay
+credential first. See [observable memory processing](../docs/memory-processing.md) for status
+reads, Helm configuration, retry behavior and the live pilot acceptance gate.
+
 ## 1. What runs where
 
 ```

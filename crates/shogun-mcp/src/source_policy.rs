@@ -143,6 +143,7 @@ pub fn tool_handling(tool: Tool) -> ToolHandling {
         | Tool::MemoryGetContextPack
         // The budgeted recall is the context-pack assembly (E4-T3): same rows, same filter.
         | Tool::MemoryRecall
+        | Tool::MemoryProcessingStatus
         // The handoff object is built from that same recall (E35): same rows, same filter.
         | Tool::HandoffCreate
         | Tool::MemoryGetEvents
@@ -422,6 +423,7 @@ mod tests {
                 "memory.get_events",
                 "memory.read_session",
                 "memory.recall",
+                "memory.processing_status",
                 "handoff.create",
                 "wiki.evidence",
             ]

@@ -320,6 +320,7 @@ pub fn to_call(command: &Command, include_low: bool) -> Option<HttpCall> {
         Command::ReleaseNotes => get("/v1/device/release_notes".to_string()),
         Command::UpdateStatus => get("/v1/device/update".to_string()),
         Command::DreamStatus => get("/v1/dream/status".to_string()),
+        Command::ProcessingStatus { id } => get(format!("/v1/memory/processing/{id}")),
         Command::DreamRetry => post("/v1/dream/retry".into(), "{}".to_string()),
         Command::Capture { paused: None, .. } => get("/v1/capture/status".into()),
         Command::Capture { paused: Some(paused), minutes } => {

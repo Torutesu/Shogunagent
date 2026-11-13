@@ -58,10 +58,10 @@ describe("filterRequest", () => {
     expect(filterResponse("garbage", pending)).toBe("garbage");
   });
 
-  it("supports the frozen core reads plus the four authoritative governance reads", () => {
+  it("supports the frozen core reads, governance reads and processing status", () => {
     const table = JSON.parse(readFileSync(join(here, "..", "..", "..", "apps", "api", "fixtures", "tool-table.json"), "utf8")) as { tools: Array<{ name: string; level: string }> };
     const reads = table.tools.filter((t) => t.level === "read").map((t) => t.name).sort();
-    expect([...READ_ONLY_TOOLS].sort()).toEqual([...reads, ...governanceReads].sort());
+    expect([...READ_ONLY_TOOLS].sort()).toEqual([...reads, ...governanceReads, "memory.processing_status"].sort());
     for (const t of table.tools.filter((t) => t.level !== "read")) expect(READ_ONLY_TOOLS.has(t.name), t.name).toBe(false);
 
     // The interim core fixture predates governance. Pin the deliberate extension to the Rust
@@ -70,6 +70,8 @@ describe("filterRequest", () => {
     const classification = metadata.match(/pub fn tool_level\([\s\S]*?\n\}/)?.[0] ?? "";
     const readsInRust = [...classification.matchAll(/((?:Tool::\w+\s*(?:\|\s*)?)+)=>\s*ApiLevel::Read\b/g)]
       .flatMap((match) => [...(match[1] ?? "").matchAll(/Tool::(\w+)/g)].map((variant) => variant[1]));
+    expect(readsInRust).toContain("MemoryProcessingStatus");
+    expect(metadata).toContain('Tool::MemoryProcessingStatus => "memory.processing_status"');
     for (const [index, variant] of ["ApprovalsList", "ApprovalsGet", "AuditList", "AclList"].entries()) {
       expect(metadata).toContain(`Tool::${variant} => "${governanceReads[index]}"`);
       expect(readsInRust).toContain(variant);

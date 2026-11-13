@@ -168,6 +168,7 @@ pub enum Command {
     /// result, if it has none, and the actions available for it with a code when one is off
     /// (issue #285 — the Settings "Nightly review" row as a read).
     DreamStatus,
+    ProcessingStatus { id: i64 },
     /// `shogun dream retry` → resume the pending Batch review now (`dream.retry`).
     DreamRetry,
     Capture { paused: Option<bool>, minutes: Option<u32> },
@@ -777,6 +778,7 @@ impl Command {
             Command::ReleaseNotes => Tool::DeviceReleaseNotesGet,
             Command::UpdateStatus => Tool::DeviceUpdateGet,
             Command::DreamStatus => Tool::DreamStatus,
+            Command::ProcessingStatus { .. } => Tool::MemoryProcessingStatus,
             Command::DreamRetry => Tool::DreamRetry,
             Command::Capture { paused: None, .. } => Tool::CaptureStatus,
             Command::Capture { .. } => Tool::CaptureSetPaused,
@@ -1082,6 +1084,7 @@ COMMANDS:
     update [status]           Automatic updates on/off, staged or available version, next check
                               (install and restart are in the app only)
     dream retry               Resume the pending Batch review now (safe to repeat)
+    processing status <event-id>  Read progress and freshness for a saved event; never starts model work
     dream [status]            Nightly review: last night's result, why it failed or didn't run,
                               whether the result shown is from an older night, and which
                               actions are available (with a code when one is off)

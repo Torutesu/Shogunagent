@@ -945,6 +945,14 @@ fn parse_command(positionals: &[String]) -> Result<Command, CliError> {
             Some("retry") => Ok(Command::DreamRetry),
             Some(other) => Err(CliError::UnknownSubcommand { command: "dream", got: other.to_string() }),
         },
+        "processing" => match rest.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
+            ["status", raw] => {
+                let id = raw.parse::<i64>().ok().filter(|id| *id > 0)
+                    .ok_or_else(|| CliError::BadId((*raw).to_string()))?;
+                Ok(Command::ProcessingStatus { id })
+            }
+            _ => Err(CliError::MissingArgument("processing status <event-id>")),
+        },
         "capture" => match rest.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
             [] | ["status"] => Ok(Command::Capture { paused: None, minutes: None }),
             ["pause"] => Ok(Command::Capture { paused: Some(true), minutes: None }),

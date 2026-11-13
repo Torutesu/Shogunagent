@@ -13,6 +13,7 @@ Related documents, which this runbook orders and does not repeat in full:
 | `apps/api/DEPLOY.md` | The relay/gateway Worker in depth: database role, Hyperdrive, provider hard limits, speech rollout, agent API, billing, enterprise |
 | `apps/router/README.md`, `apps/router/src/env.ts` | The router Worker, its wallet and settlement outbox |
 | `deploy/README.md` | The sidecar (`shogun-api --multi`), KMS key providers, regions, Helm, backup and restore |
+| `docs/memory-processing.md` | Opt-in sidecar worker, event status, retry/restart semantics and live pilot acceptance |
 | `docs/release.md` | Publishing the SDKs and the CLI (not covered here) |
 | `docs/shogunai-origin/ai-gateway-launch-checklist.md` | Provider zero-retention and Azure items inherited from ShogunAI |
 | `docs/directories/submission-checklist.md` | What the directory listings need from this deployment |

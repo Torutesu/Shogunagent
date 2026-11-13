@@ -65,6 +65,7 @@ pub fn next_action_for_code(code: &str) -> Option<&'static str> {
         "revision_changed" => "reread",
         "rate_limited"
         | "memory_unavailable"
+        | "processing_unavailable"
         | "memory_update_pending"
         | "memory_newer_than_app"
         | "unavailable"

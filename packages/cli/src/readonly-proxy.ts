@@ -15,7 +15,7 @@ import type { Readable, Writable } from "node:stream";
 /** Supported core and governance reads; new tools remain denied until explicitly reviewed. */
 export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   "memory.search", "memory.get_context", "memory.get_context_pack", "memory.get_events", "memory.read_session",
-  "memory.get_wrap", "memory.get_periods", "memory.recall", "calendar.upcoming", "profile.whoami",
+  "memory.get_wrap", "memory.get_periods", "memory.recall", "memory.processing_status", "calendar.upcoming", "profile.whoami",
   "state.commitments.list", "state.open_loops.list", "state.people.list", "state.projects.list",
   "state.people.get", "state.projects.get", "wiki.evidence", "actions.status",
   "approvals.list", "approvals.get", "audit.list", "acl.list",

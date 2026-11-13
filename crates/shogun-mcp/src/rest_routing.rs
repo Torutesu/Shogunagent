@@ -176,6 +176,12 @@ pub(super) fn resolve(method: Method, path: &str) -> Result<Routed, RouteMiss> {
                 id: None,
             },
         ),
+        ["v1", "memory", "processing", id] => match id.parse::<i64>() {
+            Ok(id) if id > 0 => method_is(method, Method::Get, Routed::Read {
+                tool: Tool::MemoryProcessingStatus, id: Some(id),
+            }),
+            _ => Err(RouteMiss::NotFound),
+        },
         // Memory import (#384 / #391). The preview is a read that takes a body, so it is a POST;
         // the commit and the undo are L1 local writes.
         ["v1", "memory", "import", "preview"] => method_is(

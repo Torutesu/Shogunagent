@@ -34,6 +34,7 @@ pub fn is_structured_read(tool: Tool) -> bool {
             | Tool::DeviceAccountGet
             // The nightly Dream Cycle status and its morning reason (issue #285).
             | Tool::DreamStatus
+            | Tool::MemoryProcessingStatus
             // Contradiction flags (issue #253): a pair of commitments per row; the backend
             // applies the Low-band exclusion and the "possibly" cap per side.
             | Tool::StateDisputesList

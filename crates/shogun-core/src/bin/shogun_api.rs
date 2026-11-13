@@ -282,6 +282,8 @@ async fn serve_multi(root: std::path::PathBuf) -> std::io::Result<()> {
     // own store (threat model R10); the sink finds the store once it exists.
     let vars: std::collections::HashMap<String, String> = std::env::vars().collect();
     let audit_store: Arc<std::sync::OnceLock<std::sync::Weak<PrincipalStore>>> = Arc::default();
+    let processing_interval = shogun_core::tenancy::processing_runtime::interval_from_vars(&vars)
+        .map_err(|name| std::io::Error::other(format!("{name} must be 0 (off) or 30..3600 seconds")))?;
     let audit = shogun_core::tenancy::multi::connector_audit_sink(audit_store.clone());
     let connectors = shogun_core::tenancy::multi::hosted_connectors(credentials.clone(), &vars, Some(audit)).unwrap_or_else(|var| {
         eprintln!("{FACE}: {var} is malformed (see deploy/README.md, hosted connector credentials)");
@@ -302,9 +304,9 @@ async fn serve_multi(root: std::path::PathBuf) -> std::io::Result<()> {
         "{FACE}: connector credentials served to the gateway (connect flow: {})",
         if connectable.is_empty() { "off: SHOGUN_CONNECT_REDIRECT_URI or the clients unset".to_string() } else { connectable.join(", ") }
     );
-    let state = shogun_core::tenancy::multi::app_state_with_credentials(store, Arc::new(resolver), clock, Some(credentials))
+    let state = shogun_core::tenancy::multi::app_state_with_credentials(store.clone(), Arc::new(resolver), clock.clone(), Some(credentials.clone()))
         .with_approval_executor(executor)
-        .with_connector_vault(connectors);
+        .with_connector_vault(connectors.clone());
     let port = std::env::var("SHOGUN_API_PORT")
         .ok()
         .and_then(|p| p.parse().ok())
@@ -316,7 +318,12 @@ async fn serve_multi(root: std::path::PathBuf) -> std::io::Result<()> {
         "shogun-memory-api listening on http://{addr}  (multi-principal root: {}, max open: {max_open})",
         root.display()
     );
-    serve_on(listener, state.with_port(addr.port())).await
+    let worker = processing_interval.map(|interval| tokio::spawn(
+        shogun_core::tenancy::processing_runtime::run(store, credentials, clock, interval, connectors),
+    ));
+    let result = serve_on(listener, state.with_port(addr.port())).await;
+    if let Some(worker) = worker { worker.abort(); }
+    result
 }
 
 /// Bind exactly `port` on loopback or end the process with a message that names the port and the
@@ -412,9 +419,8 @@ fn attach_local_embedder(db: Db) -> Db {
 /// principal's own connector credentials (refreshed through the vault with the hosted clients of
 /// `SHOGUN_CONNECT_*`) and stored in the principal's file, so the same tick reviews them.
 async fn dream_tick(root: std::path::PathBuf) -> std::io::Result<()> {
-    use shogun_core::llm::relay::{ModelClass, RelayBatchClient, RelayConfig};
-    use shogun_core::llm::transport::ReqwestTransport;
-    use shogun_core::tenancy::credentials::{local_store, relay_bearer, token_dir, TOKEN_STORE_DIR_VAR};
+    let _guard = shogun_core::tenancy::processing_runtime::acquire(&root).map_err(std::io::Error::other)?;
+    use shogun_core::tenancy::credentials::{local_store, token_dir, TOKEN_STORE_DIR_VAR};
     use shogun_core::tenancy::{dream_tick, PrincipalStore};
     let keys = principal_keys(&root);
     let clock = wall_clock();
@@ -423,9 +429,6 @@ async fn dream_tick(root: std::path::PathBuf) -> std::io::Result<()> {
         token_dir(&root, std::env::var_os(TOKEN_STORE_DIR_VAR).map(std::path::PathBuf::from)),
         keys.clone(),
     );
-    // The transport is built lazily, once, and only if some principal has a credential: a tick
-    // where every principal stays local opens no HTTP client at all.
-    let transport: std::sync::OnceLock<Option<ReqwestTransport>> = std::sync::OnceLock::new();
     // One file open at a time: the tick visits each principal once. Same open policy as
     // `--multi` (the sidecar owns these files); only files already on disk are visited.
     // The tick also embeds each visited principal's backlog when a local model is installed (E24).
@@ -457,22 +460,7 @@ async fn dream_tick(root: std::path::PathBuf) -> std::io::Result<()> {
         }
         Err(var) => eprintln!("{FACE}: connector read-sync skipped ({var} is malformed)"),
     }
-    let report = dream_tick::hourly_tick_routed(
-        &store,
-        &principals,
-        |principal, db| {
-            let bearer = relay_bearer(tokens.as_ref(), principal)?;
-            let transport = transport.get_or_init(|| ReqwestTransport::shared().ok()).clone()?;
-            Some(RelayBatchClient::new(
-                transport,
-                db.traceability_sink(),
-                bearer,
-                RelayConfig::new(ModelClass::Classify),
-            ))
-        },
-        now,
-    )
-    .await;
+    let report = shogun_core::tenancy::processing_runtime::tick(&store, tokens.as_ref(), now, true).await;
     println!("{FACE}: dream tick: {}", dream_tick::summary(&report));
     Ok(())
 }
@@ -480,7 +468,8 @@ async fn dream_tick(root: std::path::PathBuf) -> std::io::Result<()> {
 /// `shogun-api --store-relay-credential <principal> [--multi <root>]` (E5-T5): read the
 /// principal's Batch relay bearer from stdin (never from argv, which other users can read in the
 /// process table) and seal it into the local token store `--dream-tick` reads. An empty line
-/// removes it, and the principal's tick returns to the local rules.
+/// removes it. Automatic processing waits for a credential; explicit ticks can use local rules
+/// when no unfinished model review is present.
 fn store_relay_credential(root: std::path::PathBuf, principal: &str) -> std::io::Result<()> {
     use shogun_core::llm::Secret;
     use shogun_core::tenancy::credentials::{local_store, token_dir, TOKEN_STORE_DIR_VAR};

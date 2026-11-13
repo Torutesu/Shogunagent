@@ -56,6 +56,7 @@ export const STATE_READ_ROUTES = Object.freeze([
   { method: "get", path: "/v1/state/open_loops", tool: "state.open_loops.list" },
   { method: "get", path: "/v1/state/people/:person", tool: "state.people.get" },
   { method: "post", path: "/v1/memory/recall", tool: "memory.recall" },
+  { method: "get", path: "/v1/memory/processing/:id", tool: "memory.processing_status" },
 ] as const);
 /** The sidecar paths the relay serves: the MCP transport, the REST handoff route whose object the
  * core assembles (E35), and the REST face of `payments.*` (E51, docs/api/payments.md). The
@@ -72,7 +73,8 @@ export function sidecarPathOf(request: Request): string {
     const url = new URL(request.url);
     path = url.pathname;
     const stateRead = STATE_READ_ROUTES.some((route) => route.method.toUpperCase() === request.method &&
-      (route.path === path || (route.path === "/v1/state/people/:person" && /^\/v1\/state\/people\/[^/]+$/.test(path))));
+      (route.path === path || (route.path === "/v1/state/people/:person" && /^\/v1\/state\/people\/[^/]+$/.test(path)) ||
+       (route.path === "/v1/memory/processing/:id" && /^\/v1\/memory\/processing\/[^/]+$/.test(path))));
     if (stateRead) return path + url.search;
   } catch {
     return SIDECAR_MCP_PATH;

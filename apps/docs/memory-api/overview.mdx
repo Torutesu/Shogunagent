@@ -60,7 +60,7 @@ Each token has a scope, set when you issue it.
 A refused call answers `scope_insufficient` before anything runs: HTTP 403 on
 REST and the CLI, JSON-RPC error `-32004` on MCP (its message starts with
 `scope_insufficient:`). A read-only MCP client is not shown the tools it cannot
-call: of the 172 tools, it lists the 92 reads. Tokens issued before scopes
+call: of the 173 tools, it lists the 93 reads. Tokens issued before scopes
 existed are `full` and keep working. Before the first token exists, local
 process trust is `full` too.
 

@@ -6,7 +6,7 @@
 //! excerpts go to the model once, and its short answer is applied under the code checks (exact
 //! quote of a shown event, confidence ≥ 0.84, at most six items, resolved needs a quote).
 //!
-//! Batch lane only (invariant 5), best effort: a failure changes nothing. The gate counts the call
+//! Batch lane only (invariant 5), best effort: a failure preserves unread work and records a fixed status code. The gate counts the call
 //! from its traceability row, so a failed call is not repeated within the hour and still counts
 //! against the daily cap.
 
@@ -86,15 +86,27 @@ pub async fn consolidate_loops<B: BatchLane>(db: &Db, lane: &B, now_ms: i64) -> 
         return None;
     }
     let input = db.loops_consolidation_input(now)?;
-    let results = lane.review(&consolidate_items(&input.text)).await.ok()?;
-    // An answer that is not JSON still marks its signals read, so one bad batch cannot stall the
-    // queue; a failed call does not (it is retried after the hour gap).
-    let answer = results
+    let results = match lane.review(&consolidate_items(&input.text)).await {
+        Ok(results) => results,
+        Err(_) => {
+            db.record_processing_failure(&input.read, Some("consolidation_transport"), now);
+            return None;
+        }
+    };
+    // A malformed/failed answer must not acknowledge unread work. Preserve it for the normal
+    // bounded retry cadence; report a fixed code, never the provider's response text.
+    let answer: Option<serde_json::Value> = results
         .first()
+        .filter(|r| results.len() == 1 && r.custom_id == "loops" && r.error.is_none())
         .and_then(|r| r.text.as_deref())
-        .and_then(|t| serde_json::from_str(t).ok())
-        .unwrap_or(serde_json::Value::Null);
-    db.apply_loops_answer(&answer, &input.events, &input.read, now)
+        .and_then(|t| serde_json::from_str(t).ok());
+    let Some(answer) = answer.filter(|a| ["open", "resolved", "duplicates"].iter().all(|key| a.get(key).is_some_and(serde_json::Value::is_array))) else {
+        db.record_processing_failure(&input.read, Some("consolidation_output"), now);
+        return None;
+    };
+    let applied = db.apply_loops_answer(&answer, &input.events, &input.read, now);
+    db.record_processing_failure(&input.read, if applied.is_some() { None } else { Some("consolidation_storage") }, now);
+    applied
 }
 
 #[cfg(test)]

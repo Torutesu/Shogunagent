@@ -346,6 +346,9 @@ fn run_scenario(mut provider: impl FnMut(&Db) -> Option<Box<dyn AgentClient>>) {
     .enumerate()
     {
         let sources = scenario.ingest(alice.db(), stage, messages);
+        for id in &sources {
+            assert_eq!(alice.db().memory_processing_status(*id, false)["state"], "pending");
+        }
         if stage == 0 {
             assert!(
                 recall(alice.db(), "Nebula Toru").items.is_empty(),
@@ -369,6 +372,12 @@ fn run_scenario(mut provider: impl FnMut(&Db) -> Option<Box<dyn AgentClient>>) {
             "stage {stage}: hourly review"
         );
         assert!(applied.is_some(), "stage {stage}: consolidator ran");
+        for id in &sources {
+            let status = alice.db().memory_processing_status(*id, false);
+            assert_eq!(status["state"], "ready", "stage {stage}: {status}");
+            assert!(status["reviewed_at_ms"].is_i64());
+            assert!(!status.to_string().contains(PROMISE));
+        }
         assert_eq!(
             lane.calls.load(Ordering::SeqCst),
             2,
@@ -588,6 +597,10 @@ fn run_scenario(mut provider: impl FnMut(&Db) -> Option<Box<dyn AgentClient>>) {
             replay.event_ids, sources,
             "stage {stage}: ingest receipts survive reopening the encrypted store"
         );
+        for id in &sources {
+            assert_eq!(alice.db().memory_processing_status(*id, false)["state"], "ready",
+                "processing receipts survive restart and replay");
+        }
         println!(
             "PASS stage {stage}: state, grounding, deadline/status, tenant isolation, replay and restart"
         );

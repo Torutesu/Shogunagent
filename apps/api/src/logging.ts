@@ -108,6 +108,7 @@ export function routeTemplate(pathname: string): string {
   if (["/v1/keys", "/v1/payments/mandates", "/v1/payments/mandates/list", "/v1/payments/mandates/request", "/v1/payments/mandates/revoke", "/v1/payments/spend"].includes(pathname)) return pathname;
   if (["/v1/state/commitments", "/v1/state/open_loops", "/v1/memory/recall"].includes(pathname)) return pathname;
   if (/^\/v1\/state\/people\/[^/]+$/.test(pathname)) return "/v1/state/people/:person";
+  if (/^\/v1\/memory\/processing\/[^/]+$/.test(pathname)) return "/v1/memory/processing/:id";
   // The agent-readable documents (plan E10, wellknown/app.ts): fixed paths, no ids.
   if (["/.well-known/mcp/server-card.json", "/.well-known/agent-card.json", "/.well-known/status.json", "/.well-known/mcp-config",
     "/health", "/openapi.json", "/llms.txt", "/llms-full.txt", "/privacy", "/terms"].includes(pathname)) return pathname;

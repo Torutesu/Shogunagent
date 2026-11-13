@@ -38,6 +38,8 @@ pub mod import;
 pub mod key_provider;
 #[cfg(feature = "daemon-server")]
 pub mod multi;
+#[cfg(feature = "daemon-server")]
+pub mod processing_runtime;
 pub mod principal;
 pub mod resolver;
 pub mod store;
