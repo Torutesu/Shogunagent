@@ -2242,9 +2242,9 @@ struct PipeThreads {
 
 impl PipeThreads {
     fn finished(&self) -> bool {
-        self.writer.as_ref().map_or(true, std::thread::JoinHandle::is_finished)
-            && self.stdout.as_ref().map_or(true, std::thread::JoinHandle::is_finished)
-            && self.stderr.as_ref().map_or(true, std::thread::JoinHandle::is_finished)
+        self.writer.as_ref().is_none_or(std::thread::JoinHandle::is_finished)
+            && self.stdout.as_ref().is_none_or(std::thread::JoinHandle::is_finished)
+            && self.stderr.as_ref().is_none_or(std::thread::JoinHandle::is_finished)
     }
 
     fn wait_until(&self, deadline: std::time::Instant) -> bool {

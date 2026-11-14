@@ -219,7 +219,7 @@ fn has_term(text: &str, term: &str) -> bool {
         text[..at]
             .chars()
             .next_back()
-            .map_or(true, |c| !c.is_ascii_alphanumeric())
+            .is_none_or(|c| !c.is_ascii_alphanumeric())
     })
 }
 

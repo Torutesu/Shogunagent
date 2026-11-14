@@ -15,10 +15,10 @@ description = "SHOGUN memory: SQLite schema, versioned migrations, event log, st
 shogun-redact = { path = "../shogun-redact" }
 # The canonical event_log dedup hash (event_log::content_hash). Same crate/version as shogun-core.
 twox-hash = "1"
-rusqlite = { version = "0.31", features = ["backup", "blob", "bundled-sqlcipher-vendored-openssl", "hooks"] }
+rusqlite = { version = "0.42", features = ["fallible_uint", "backup", "blob", "bundled-sqlcipher-vendored-openssl", "hooks"] }
 sqlite-vec = "0.1"
 zerocopy = "0.7"
-refinery = { version = "0.8", features = ["rusqlite"] }
+refinery = { version = "0.10", features = ["rusqlite"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # sha256 of source event bodies in export v2 provenance pointers (E27). Already in the graph.

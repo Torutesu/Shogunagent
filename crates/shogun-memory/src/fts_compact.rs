@@ -12,7 +12,8 @@
 //! This module holds the SQL-level primitives the core's compaction job drives, one short
 //! transaction at a time:
 //! - [`Structure`] decodes the FTS5 structure record (`%_data` rowid 10) of the shipped engine
-//!   (SQLite 3.39.4 = SQLCipher 4.5.3, the V1 record format). It tells whether a merge is already
+//!   (SQLite 3.54.1 = SQLCipher 4.20.0, the V1 record format; FTS5 writes V2 only for
+//!   `contentless_delete` tables, which this schema has none of). It tells whether a merge is already
 //!   in progress, how many leaf pages sit outside the largest segment, and so what is left to do.
 //! - [`plan`] decides the next move for one table: begin a merge of every segment (a negative
 //!   `'merge'`), continue the merge in progress (a positive `'merge'`, so the in-progress merge is
@@ -85,7 +86,7 @@ pub struct Level {
     pub segments: Vec<Segment>,
 }
 
-/// The decoded FTS5 structure record (V1 format, SQLite 3.39).
+/// The decoded FTS5 structure record (V1 format; re-verified on SQLite 3.54.1).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Structure {
     pub write_counter: u64,
@@ -422,13 +423,27 @@ impl DbPages {
 
 /// Read [`DbPages`] (four pragmas; no table scan).
 pub fn db_pages(conn: &Connection) -> Result<DbPages, rusqlite::Error> {
-    let pragma = |name: &str| conn.query_row(&format!("PRAGMA {name}"), [], |r| r.get::<_, i64>(0));
+    let pragma = |name: &str| conn.query_row(&format!("PRAGMA {name}"), [], pragma_integer);
     Ok(DbPages {
         page_size: pragma("page_size")?,
         page_count: pragma("page_count")?,
         freelist_count: pragma("freelist_count")?,
         auto_vacuum: pragma("auto_vacuum")?,
     })
+}
+
+/// An integer pragma result. On a keyed connection SQLCipher answers `PRAGMA page_size` itself
+/// (its codec page size, the same number) and returns it as text, so accept a decimal string too.
+fn pragma_integer(row: &rusqlite::Row<'_>) -> Result<i64, rusqlite::Error> {
+    use rusqlite::types::{Type, ValueRef};
+    match row.get_ref(0)? {
+        ValueRef::Integer(value) => Ok(value),
+        ValueRef::Text(text) => std::str::from_utf8(text)
+            .ok()
+            .and_then(|text| text.trim().parse().ok())
+            .ok_or_else(|| rusqlite::Error::InvalidColumnType(0, "pragma".into(), Type::Text)),
+        other => Err(rusqlite::Error::InvalidColumnType(0, "pragma".into(), other.data_type())),
+    }
 }
 
 /// Hand up to `max_pages` free pages back to the filesystem (`auto_vacuum = INCREMENTAL` only; a
@@ -448,6 +463,22 @@ pub fn release_free_pages(conn: &Connection, max_pages: i64) -> Result<i64, rusq
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// SQLCipher answers `PRAGMA page_size` on a keyed connection as text; the plaintext page
+    /// size must still come back as the same integer.
+    #[test]
+    fn db_pages_reads_keyed_and_plaintext_databases_alike() {
+        let path = crate::fts_page_size_tests::temp("db-pages-keyed");
+        let keyed = crate::open_encrypted(&path, &crate::fts_page_size_tests::key()).unwrap();
+        let plain = crate::open_in_memory().unwrap();
+        let expected: i64 = plain.query_row("PRAGMA page_size", [], |r| r.get(0)).unwrap();
+        let keyed_pages = db_pages(&keyed).unwrap();
+        assert_eq!(keyed_pages.page_size, expected);
+        assert!(keyed_pages.page_count > 0);
+        assert_eq!(db_pages(&plain).unwrap().page_size, expected);
+        drop(keyed);
+        crate::fts_page_size_tests::remove(&path);
+    }
 
     fn encode_varint(mut v: u64, out: &mut Vec<u8>) {
         // Test-only encoder for values below 2^56 (7-bit groups, big-endian).

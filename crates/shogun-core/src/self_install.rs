@@ -517,7 +517,7 @@ pub fn eject_request(args: &[OsString], now_secs: u64) -> Option<PathBuf> {
 pub fn strip_relaunch_args(args: impl IntoIterator<Item = OsString>) -> Vec<OsString> {
     args.into_iter()
         .filter(|arg| {
-            arg.to_str().map_or(true, |text| {
+            arg.to_str().is_none_or(|text| {
                 text != RELAUNCH_ARG
                     && !text.starts_with(EJECT_ARG_PREFIX)
                     && !text.starts_with(AT_ARG_PREFIX)

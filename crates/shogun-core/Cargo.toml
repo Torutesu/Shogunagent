@@ -121,7 +121,7 @@ shogun-integrations = { path = "../shogun-integrations", features = ["live"], op
 shogun-license = { path = "../shogun-license", optional = true }
 # The `shogun-api` binary composes the shared approval queue (agents) into the server state.
 shogun-agents = { path = "../shogun-agents", optional = true }
-rusqlite = { version = "0.31", features = ["bundled-sqlcipher-vendored-openssl", "hooks"], optional = true }
+rusqlite = { version = "0.42", features = ["fallible_uint", "bundled-sqlcipher-vendored-openssl", "hooks"], optional = true }
 # On-device ASR: whisper.cpp with Metal. Fed in-memory f32 PCM (no file path), so invariant 2 holds.
 whisper-rs = { version = "0.16", features = ["metal"], optional = true }
 # Microphone capture.

@@ -44,7 +44,9 @@ pub(crate) fn open_encrypted_at(path: &Path, version: u32) -> Connection {
     apply_key(&conn, &key()).unwrap();
     apply_pragmas(&conn, true).unwrap();
     embedded::runner()
-        .set_target(refinery::Target::Version(version))
+        .set_target(refinery::Target::Version(
+            refinery::SchemaVersion::try_from(version).expect("test schema version fits refinery's"),
+        ))
         .run(&mut conn)
         .unwrap();
     conn

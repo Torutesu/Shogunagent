@@ -356,7 +356,7 @@ pub fn licence_refresh_due(expires_at: u64, now_secs: u64, last_attempt_secs: Op
 /// Has the Batch lane waited [`LICENCE_REFRESH_MIN_INTERVAL_SECS`] since its last refresh
 /// attempt? Also the limit on the refresh a relay 401 asks for, whatever the token's expiry.
 pub fn refresh_rested(now_secs: u64, last_attempt_secs: Option<u64>) -> bool {
-    last_attempt_secs.map_or(true, |at| {
+    last_attempt_secs.is_none_or(|at| {
         at > now_secs || now_secs - at >= LICENCE_REFRESH_MIN_INTERVAL_SECS
     })
 }

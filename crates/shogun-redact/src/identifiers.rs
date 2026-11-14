@@ -145,7 +145,7 @@ fn luhn_ok(digits: &[u8]) -> bool {
         }
         sum += v;
     }
-    sum % 10 == 0
+    sum.is_multiple_of(10)
 }
 
 /// Byte length of a Luhn-valid card number at the start of `s`, allowing the usual group

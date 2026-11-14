@@ -91,7 +91,7 @@ pub(crate) fn answerability(
 
     let reason = if query.trim().is_empty() {
         AnswerabilityReasonV1::EmptyQuery
-    } else if hits.first().map_or(true, |hit| !hit.answer_eligible) {
+    } else if hits.first().is_none_or(|hit| !hit.answer_eligible) {
         AnswerabilityReasonV1::NoEligibleMatch
     } else {
         let quality = hits[0].match_quality;

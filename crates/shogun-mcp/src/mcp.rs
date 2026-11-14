@@ -1813,7 +1813,7 @@ fn check_args(schema: &Value, args: &Value) -> Result<(), String> {
     }
     if let Some(forms) = schema.get("oneOf").and_then(Value::as_array) {
         let chosen = forms.iter().find(|form| {
-            form.get("properties").and_then(Value::as_object).map_or(true, |selectors| {
+            form.get("properties").and_then(Value::as_object).is_none_or(|selectors| {
                 selectors.iter().all(|(key, spec)| {
                     args.get(key).is_some_and(|value| check_value(key, spec, value).is_ok())
                 })

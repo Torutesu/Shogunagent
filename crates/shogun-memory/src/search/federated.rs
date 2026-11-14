@@ -2274,8 +2274,7 @@ fn resolve_numeric_evidence(
         .collect::<Vec<_>>()
         .chunks(EVIDENCE_BIND_CHUNK_SIZE)
     {
-        let placeholders = std::iter::repeat("?")
-            .take(ids.len())
+        let placeholders = std::iter::repeat_n("?", ids.len())
             .collect::<Vec<_>>()
             .join(",");
         let sql = format!("SELECT id FROM {table} WHERE id IN ({placeholders})");
@@ -2304,8 +2303,7 @@ fn resolve_text_evidence(
         .collect::<Vec<_>>()
         .chunks(EVIDENCE_BIND_CHUNK_SIZE)
     {
-        let placeholders = std::iter::repeat("?")
-            .take(values.len())
+        let placeholders = std::iter::repeat_n("?", values.len())
             .collect::<Vec<_>>()
             .join(",");
         let sql = format!("SELECT {key} FROM {table} WHERE {key} IN ({placeholders})");
@@ -2508,7 +2506,7 @@ mod score_tests {
 
     #[test]
     fn evidence_resolution_batches_past_sqlite_bind_limit_and_stays_fail_closed() {
-        let conn = crate::open_in_memory().unwrap();
+        let mut conn = crate::open_in_memory().unwrap();
         let evidence_count = EVIDENCE_BIND_CHUNK_SIZE * 2 + 37;
         let mut evidence = BTreeSet::new();
         for id in 1..=i64::try_from(evidence_count).unwrap() {
@@ -2523,9 +2521,9 @@ mod score_tests {
         }
 
         EVIDENCE_SELECTS.with(|selects| selects.set(0));
-        conn.authorizer(Some(count_evidence_selects));
+        conn.authorizer(Some(count_evidence_selects)).unwrap();
         let answerable = evidence_resolves(&conn, &evidence).unwrap();
-        conn.authorizer(None::<fn(AuthContext<'_>) -> Authorization>);
+        conn.authorizer(None::<fn(AuthContext<'_>) -> Authorization>).unwrap();
 
         assert!(answerable, "all persisted evidence must resolve");
         assert_eq!(

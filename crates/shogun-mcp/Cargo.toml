@@ -75,7 +75,7 @@ futures-core = { version = "0.3", optional = true }
 # Mint a licence token in-test to prove that billing overrides an expired trial end-to-end.
 ed25519-dalek = { version = "2", default-features = false, features = ["alloc"] }
 # The payments flow's tests run against the real V105 schema in memory (E46).
-rusqlite = "0.31"
+rusqlite = { version = "0.42", features = ["fallible_uint"] }
 
 [lints]
 workspace = true

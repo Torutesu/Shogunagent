@@ -260,7 +260,7 @@ impl QualityAccumulator {
             self.temporal_queries += 1;
             if let Some(stale_rank) = rank_of(superseded) {
                 self.stale_returned += 1;
-                if correct.map_or(true, |c| stale_rank < c) {
+                if correct.is_none_or(|c| stale_rank < c) {
                     self.stale_outranked_current += 1;
                 }
             }

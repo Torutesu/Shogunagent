@@ -216,7 +216,7 @@ fn best_highlight(text: &str, require_salience: bool) -> Option<(u8, String)> {
                     continue;
                 }
                 let candidate = (score, position, bounded_highlight(sentence));
-                if best.as_ref().map_or(true, |current| {
+                if best.as_ref().is_none_or(|current| {
                     (candidate.0, candidate.1) >= (current.0, current.1)
                 }) {
                     best = Some(candidate);

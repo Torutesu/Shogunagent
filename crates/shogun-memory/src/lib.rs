@@ -135,7 +135,7 @@ pub enum MemoryError {
     /// divergent name/checksum, a version this build does not embed, or a gap below the newest
     /// applied one). Carries the version only, never a stored name or checksum.
     #[error("migration history does not match this build at V{0}; memory left unchanged")]
-    HistoryMismatch(u32),
+    HistoryMismatch(refinery::SchemaVersion),
 }
 
 /// Apply the crash-safety pragmas (NFR-REL-01). `wal` is skipped for in-memory databases,
@@ -198,7 +198,7 @@ fn migrate_and_check(conn: &mut Connection) -> Result<(), MemoryError> {
         [],
         |r| r.get(0),
     )?;
-    let applied: Vec<u32> = if has_history {
+    let applied: Vec<refinery::SchemaVersion> = if has_history {
         catch_history_panic(|| embedded::runner().get_applied_migrations(conn))??
             .iter()
             .map(|m| m.version())
@@ -206,7 +206,7 @@ fn migrate_and_check(conn: &mut Connection) -> Result<(), MemoryError> {
     } else {
         Vec::new()
     };
-    let pending: Vec<u32> = embedded::runner()
+    let pending: Vec<refinery::SchemaVersion> = embedded::runner()
         .get_migrations()
         .iter()
         .map(|m| m.version())
@@ -405,7 +405,7 @@ pub fn is_plaintext_db(path: impl AsRef<Path>) -> bool {
 /// has on disk. For tests and tooling that exercise the upgrade path (the principal import, E2-T6);
 /// never a product entry point.
 #[doc(hidden)]
-pub fn open_plaintext_at_version(path: impl AsRef<Path>, version: u32) -> Result<Connection, MemoryError> {
+pub fn open_plaintext_at_version(path: impl AsRef<Path>, version: refinery::SchemaVersion) -> Result<Connection, MemoryError> {
     vector::register_extension();
     let mut conn = Connection::open(path)?;
     apply_pragmas(&conn, true)?;

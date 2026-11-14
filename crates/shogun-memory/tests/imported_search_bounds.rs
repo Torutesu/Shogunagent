@@ -18,6 +18,8 @@
 //! ```text
 //! cargo test -p shogun-memory --release --test search_slo -- --ignored --nocapture
 //! ```
+
+#![allow(clippy::expect_used)]
 #![allow(clippy::unwrap_used)]
 
 mod support;
@@ -44,7 +46,10 @@ const VM_PER_CLAIM_BUDGET: u64 = 192;
 
 /// Exact SQLite VM instruction count for `f` on `conn` (progress handler at granularity 1).
 /// Deterministic for a given SQLite build, schema and data — unlike elapsed time.
-fn vm_instructions<T>(conn: &rusqlite::Connection, f: impl FnOnce() -> T) -> (T, u64) {
+fn vm_instructions<T>(
+    conn: &mut rusqlite::Connection,
+    f: impl FnOnce(&rusqlite::Connection) -> T,
+) -> (T, u64) {
     let count = Arc::new(AtomicU64::new(0));
     let counter = Arc::clone(&count);
     conn.progress_handler(
@@ -53,9 +58,11 @@ fn vm_instructions<T>(conn: &rusqlite::Connection, f: impl FnOnce() -> T) -> (T,
             counter.fetch_add(1, Ordering::Relaxed);
             false
         }),
-    );
-    let out = f();
-    conn.progress_handler(0, None::<fn() -> bool>);
+    )
+    .expect("install VM counter");
+    let out = f(conn);
+    conn.progress_handler(0, None::<fn() -> bool>)
+        .expect("remove VM counter");
     (out, count.load(Ordering::Relaxed))
 }
 
@@ -95,16 +102,16 @@ fn imported_claim_lane_work_is_capped_and_linear_at_twenty_thousand_items() {
 
     // 10,000 claims, then 20,000: the lane's instruction count must scale with the claims.
     let mut import_ids = insert_matching_imported_claims(&mut conn, 20, CLAIMS_PER_IMPORT);
-    let (half_lane, half_ops) = vm_instructions(&conn, || {
-        search_imported(&conn, &terms, 0.5, LANE_LIMIT).unwrap()
+    let (half_lane, half_ops) = vm_instructions(&mut conn, |conn| {
+        search_imported(conn, &terms, 0.5, LANE_LIMIT).unwrap()
     });
     import_ids.extend(insert_matching_imported_claims(
         &mut conn,
         20,
         CLAIMS_PER_IMPORT,
     ));
-    let (lane, full_ops) = vm_instructions(&conn, || {
-        search_imported(&conn, &terms, 0.5, LANE_LIMIT).unwrap()
+    let (lane, full_ops) = vm_instructions(&mut conn, |conn| {
+        search_imported(conn, &terms, 0.5, LANE_LIMIT).unwrap()
     });
     let claims = (import_ids.len() * CLAIMS_PER_IMPORT) as u64;
     eprintln!(

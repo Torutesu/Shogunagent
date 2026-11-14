@@ -95,7 +95,7 @@ pub fn bind_google_arguments(
         .is_some_and(|required| {
             required
                 .iter()
-                .any(|key| key.as_str().map_or(true, |key| !out.contains_key(key)))
+                .any(|key| key.as_str().is_none_or(|key| !out.contains_key(key)))
         })
     {
         return Err("Google tool requires unsupported arguments".into());
@@ -467,7 +467,7 @@ pub fn validate_arguments(tool: &str, arguments: &Value, tools: &[Value]) -> Res
         .is_some_and(|required| {
             required.iter().any(|key| {
                 key.as_str()
-                    .map_or(true, |key| !arguments.contains_key(key))
+                    .is_none_or(|key| !arguments.contains_key(key))
             })
         })
     {

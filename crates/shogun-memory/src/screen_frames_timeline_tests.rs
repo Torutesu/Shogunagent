@@ -124,7 +124,7 @@ impl Lcg {
     }
 
     fn one_in(&mut self, n: u64) -> bool {
-        self.next() % n == 0
+        self.next().is_multiple_of(n)
     }
 }
 
@@ -490,10 +490,17 @@ fn the_fts_match_runs_once_per_request_not_per_frame() {
     let conn = crate::open_in_memory().unwrap();
     let expr = "\"comet\"";
     let fts_reads = |plan: &[String]| plan.iter().filter(|row| row.contains("event_fts")).count();
-    let correlated = |plan: &[String]| plan.iter().any(|row| row.contains("CORRELATED"));
+    // Per frame: a correlated subquery (SQLite 3.39), or the same EXISTS run as an inner join
+    // loop (`SCAN event_fts EXISTS ...`, SQLite 3.53+'s EXISTS-to-join). Either way FTS is
+    // consulted once for every frame in range.
+    let per_frame = |plan: &[String]| {
+        plan.iter().any(|row| {
+            row.contains("CORRELATED") || (row.contains("event_fts") && row.contains(" EXISTS "))
+        })
+    };
 
     let legacy = plan(&conn, &legacy_count_sql(), params![0, 1, None::<&str>, expr]);
-    assert!(correlated(&legacy), "the oracle is the per-frame shape: {legacy:?}");
+    assert!(per_frame(&legacy), "the oracle is the per-frame shape: {legacy:?}");
 
     let count = plan(&conn, &timeline_count_sql(true, false), params![0, 1, None::<&str>, expr]);
     let mut pages = Vec::new();
@@ -507,7 +514,7 @@ fn the_fts_match_runs_once_per_request_not_per_frame() {
     }
     for plan in std::iter::once(&count).chain(&pages) {
         assert_eq!(fts_reads(plan), 1, "one FTS read per statement: {plan:?}");
-        assert!(!correlated(plan), "no per-frame subquery: {plan:?}");
+        assert!(!per_frame(plan), "no per-frame FTS lookup: {plan:?}");
         assert!(
             plan.iter().any(|row| row.contains("MATERIALIZE")),
             "the hit set is materialized once: {plan:?}"

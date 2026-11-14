@@ -68,7 +68,7 @@ impl KeywordSearcher for MemSearcher {
             .docs
             .iter()
             .enumerate()
-            .filter(|(_, d)| range.map_or(true, |r| d.date_ms >= r.from_ms && d.date_ms < r.to_ms))
+            .filter(|(_, d)| range.is_none_or(|r| d.date_ms >= r.from_ms && d.date_ms < r.to_ms))
             .map(|(i, d)| {
                 let lower = d.text.to_lowercase();
                 (i, terms.iter().filter(|t| lower.contains(t.as_str())).count())

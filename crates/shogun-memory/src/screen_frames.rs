@@ -566,8 +566,7 @@ pub fn frame_ids_for_events(
     if event_ids.is_empty() {
         return Ok(std::collections::HashMap::new());
     }
-    let placeholders = std::iter::repeat("?")
-        .take(event_ids.len())
+    let placeholders = std::iter::repeat_n("?", event_ids.len())
         .collect::<Vec<_>>()
         .join(",");
     let sql = format!(

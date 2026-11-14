@@ -116,9 +116,9 @@ impl Haystack {
             let start = from + at;
             let end = start + needle.len();
             let before_ok =
-                !is_word_char(first) || self.text[..start].chars().last().map_or(true, |c| !is_word_char(c));
+                !is_word_char(first) || self.text[..start].chars().last().is_none_or(|c| !is_word_char(c));
             let after_ok =
-                !is_word_char(last) || self.text[end..].chars().next().map_or(true, |c| !is_word_char(c));
+                !is_word_char(last) || self.text[end..].chars().next().is_none_or(|c| !is_word_char(c));
             if before_ok && after_ok {
                 return true;
             }

@@ -324,7 +324,7 @@ impl<P: TokenProvider> McpRpc for GmailDirectRpc<P> {
                 if result
                     .get("id")
                     .and_then(Value::as_str)
-                    .map_or(true, str::is_empty)
+                    .is_none_or(str::is_empty)
                 {
                     return Err(
                         if tool == "send_email" {

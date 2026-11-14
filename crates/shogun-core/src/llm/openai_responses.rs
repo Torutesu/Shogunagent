@@ -656,7 +656,7 @@ impl ResponsesStream {
                     let empty = item
                         .get("content")
                         .and_then(Value::as_array)
-                        .map_or(true, |c| c.is_empty());
+                        .is_none_or(|c| c.is_empty());
                     if empty {
                         if let Some(text) = self.texts.get(&idx) {
                             item["content"] = json!([{ "type": "output_text", "text": text }]);

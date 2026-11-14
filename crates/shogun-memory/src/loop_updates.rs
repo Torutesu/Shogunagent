@@ -261,7 +261,7 @@ pub fn redated_due(lower: &str, said_at_ms: i64) -> Option<i64> {
 /// "by friday").
 fn first_date_after(rest: &str, said_at_ms: i64) -> Option<i64> {
     let starts = rest.char_indices().filter(|&(i, c)| {
-        c.is_alphanumeric() && rest[..i].chars().next_back().map_or(true, |p| !p.is_alphanumeric())
+        c.is_alphanumeric() && rest[..i].chars().next_back().is_none_or(|p| !p.is_alphanumeric())
     });
     for (i, _) in starts {
         if let Some(due) = crate::due::due_at(&format!("by {}", &rest[i..]), said_at_ms) {
@@ -281,8 +281,8 @@ fn passive_resolved(lower: &str) -> bool {
         RESOLVED_PARTICIPLES.iter().any(|pp| {
             let phrase = format!("{aux}{pp}");
             lower.match_indices(&phrase).any(|(at, _)| {
-                let before = lower[..at].chars().next_back().map_or(true, |c| !c.is_alphanumeric());
-                let after = lower[at + phrase.len()..].chars().next().map_or(true, |c| !c.is_alphanumeric());
+                let before = lower[..at].chars().next_back().is_none_or(|c| !c.is_alphanumeric());
+                let after = lower[at + phrase.len()..].chars().next().is_none_or(|c| !c.is_alphanumeric());
                 before && after
             })
         })
@@ -308,7 +308,7 @@ fn ja_redated_due(lower: &str, cue_at: usize, cue_len: usize, said_at_ms: i64) -
         let boundary = before[..i]
             .chars()
             .next_back()
-            .map_or(true, |p| !(p.is_ascii_alphanumeric() || p == '/' || p == '-'));
+            .is_none_or(|p| !(p.is_ascii_alphanumeric() || p == '/' || p == '-'));
         if !boundary {
             continue;
         }

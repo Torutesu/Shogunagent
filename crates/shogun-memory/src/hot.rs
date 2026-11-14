@@ -65,9 +65,9 @@ impl HotEvent {
         self.content.len() <= HOT_CONTENT_MAX_BYTES
             && self.source.len() <= HOT_TAG_MAX_BYTES
             && self.kind.len() <= HOT_TAG_MAX_BYTES
-            && self.app_bundle_id.as_ref().map_or(true, |value| value.len() <= HOT_METADATA_MAX_BYTES)
-            && self.window_title.as_ref().map_or(true, |value| value.len() <= HOT_METADATA_MAX_BYTES)
-            && self.thread_key.as_ref().map_or(true, |value| value.len() <= HOT_METADATA_MAX_BYTES)
+            && self.app_bundle_id.as_ref().is_none_or(|value| value.len() <= HOT_METADATA_MAX_BYTES)
+            && self.window_title.as_ref().is_none_or(|value| value.len() <= HOT_METADATA_MAX_BYTES)
+            && self.thread_key.as_ref().is_none_or(|value| value.len() <= HOT_METADATA_MAX_BYTES)
     }
 }
 

@@ -385,13 +385,8 @@ mod tests {
 
     /// Poll a future whose every await is already ready (the test sleeper and op above).
     fn block_on_ready<F: std::future::Future>(f: F) -> F::Output {
-        struct Noop;
-        impl std::task::Wake for Noop {
-            fn wake(self: std::sync::Arc<Self>) {}
-        }
-        let waker = std::task::Waker::from(std::sync::Arc::new(Noop));
         let mut f = std::pin::pin!(f);
-        let mut cx = std::task::Context::from_waker(&waker);
+        let mut cx = std::task::Context::from_waker(std::task::Waker::noop());
         loop {
             if let std::task::Poll::Ready(v) = f.as_mut().poll(&mut cx) {
                 return v;

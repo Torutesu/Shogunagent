@@ -4198,7 +4198,7 @@ mod tests {
         assert_eq!(structured(&backend, Tool::MeetingTranscriptGet, &ReadParams { id: Some(sid), ..Default::default() })["error"], "not_found");
         let hits = structured(&backend, Tool::MeetingSearch, &ReadParams { query: Some("renew vendor".into()), ..Default::default() });
         assert_eq!(hits["hits"].as_array().map(Vec::len), Some(0));
-        assert!(structured(&backend, Tool::MeetingSpeakersGet, &ReadParams { id: Some(sid), ..Default::default() })["speakers"].as_array().map_or(true, Vec::is_empty));
+        assert!(structured(&backend, Tool::MeetingSpeakersGet, &ReadParams { id: Some(sid), ..Default::default() })["speakers"].as_array().is_none_or(Vec::is_empty));
         Ok(())
     }
 

@@ -473,7 +473,7 @@ impl Db {
                 (now >= due, Some(due))
             } else {
                 let due = anchor.map(|stamp| stamp.saturating_add(WEEK_MS));
-                (due.map_or(true, |stamp| now >= stamp), due)
+                (due.is_none_or(|stamp| now >= stamp), due)
             };
             let lines = status
                 .summary

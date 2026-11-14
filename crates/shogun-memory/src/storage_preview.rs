@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use rusqlite::{Connection, DatabaseName};
+use rusqlite::{Connection, MAIN_DB};
 use serde::Serialize;
 
 use crate::fts_compact::{self, DbPages};
@@ -87,7 +87,7 @@ fn preview_in_snapshot(conn: &Connection) -> Result<StoragePreview, rusqlite::Er
             break;
         }
         // sqlite3_blob_bytes works on TEXT columns and does not materialize the whole value.
-        let blob = conn.blob_open(DatabaseName::Main, "event_log", "content", id, true)?;
+        let blob = conn.blob_open(MAIN_DB, "event_log", "content", id, true)?;
         let size = i64::from(blob.size());
         if size > MAX_ROW_BYTES {
             partial_reason = Some("single_row_byte_limit");

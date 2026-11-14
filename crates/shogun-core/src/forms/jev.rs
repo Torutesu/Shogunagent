@@ -177,7 +177,7 @@ fn names_option(fact: &str, option: &str) -> bool {
     let (fact, option) = (fact.to_lowercase(), option.trim().to_lowercase());
     !option.is_empty()
         && fact.match_indices(&option).any(|(at, _)| {
-            let edge = |c: Option<char>| c.map_or(true, |c| !c.is_alphanumeric());
+            let edge = |c: Option<char>| c.is_none_or(|c| !c.is_alphanumeric());
             edge(fact[..at].chars().next_back()) && edge(fact[at + option.len()..].chars().next())
         })
 }

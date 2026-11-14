@@ -167,7 +167,7 @@ fn ordered_commitments(commitments: &[CommitmentDue]) -> Vec<BriefItem> {
     let mut undated = 0;
     let mut kept: Vec<(&CommitmentDue, BriefItem)> = commitments
         .iter()
-        .filter(|c| c.days_until_due.map_or(true, |d| d <= DUE_SOON_DAYS))
+        .filter(|c| c.days_until_due.is_none_or(|d| d <= DUE_SOON_DAYS))
         .filter_map(|c| to_item(&c.description, c.confidence, c.provenance_event_id).map(|i| (c, i)))
         .collect();
     kept.sort_by_key(|(c, _)| (rank(c), c.due_at_ms.unwrap_or(i64::MAX)));

@@ -1268,7 +1268,7 @@ impl Db {
         }
         if self.prioritize_knowledge_evidence(query, max_hits, excerpt_chars, &mut evidence) {
             summaries.retain(|summary| {
-                summary.grounding.as_ref().map_or(true, |grounding| {
+                summary.grounding.as_ref().is_none_or(|grounding| {
                     evidence
                         .iter()
                         .any(|item| item.event_id == grounding.event_id)
@@ -1779,7 +1779,7 @@ fn one_row_per_frame(evidence: &mut Vec<Evidence>) -> std::collections::HashSet<
         let current = index;
         index += 1;
         item.frame_id
-            .map_or(true, |frame_id| keep.get(&frame_id) == Some(&current))
+            .is_none_or(|frame_id| keep.get(&frame_id) == Some(&current))
     });
     keep.into_keys().collect()
 }
