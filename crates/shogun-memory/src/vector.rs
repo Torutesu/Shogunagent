@@ -83,10 +83,8 @@ pub fn delete(conn: &Connection, event_id: i64) -> Result<(), rusqlite::Error> {
 
 /// Unpack a little-endian f32 byte blob back into a vector.
 fn from_blob(bytes: &[u8]) -> Vec<f32> {
-    bytes
-        .chunks_exact(4)
-        .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
-        .collect()
+    // A trailing partial chunk is ignored, as with `chunks_exact`.
+    bytes.as_chunks::<4>().0.iter().map(|c| f32::from_le_bytes(*c)).collect()
 }
 
 /// Read back the stored f32 embedding for `event_id` (used by Cold demotion, which re-quantizes it
