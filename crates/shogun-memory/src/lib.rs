@@ -158,6 +158,13 @@ fn apply_pragmas(conn: &Connection, wal: bool) -> Result<(), rusqlite::Error> {
     // none (600 MB store copy, docs/migrations/V87-rollback.md). Negative = KiB.
     // ponytail: fixed size; raise it if larger stores show misses on repeated lookups again.
     conn.pragma_update(None, "cache_size", -16_384)?;
+    // Keep cached statements cached. Since SQLite 3.54 every `col = ?` term marks its parameter
+    // "re-prepare on rebind", and `sqlite3_clear_bindings` (which rusqlite's statement cache calls
+    // whenever a statement goes back to the cache) then expires the statement, so every
+    // `prepare_cached` re-prepared from scratch: 2-4x on the state reads (SLO-02). The query
+    // planner stability guarantee turns those value-dependent re-plans off. Nothing here relies on
+    // them: no ANALYZE runs (no STAT4 data), and the `LIKE ?` filters have no NOCASE index to use.
+    conn.set_db_config(rusqlite::config::DbConfig::SQLITE_DBCONFIG_ENABLE_QPSG, true)?;
     Ok(())
 }
 
@@ -602,6 +609,24 @@ mod tests {
             .unwrap();
         let rows = stmt.query_map([], |r| r.get::<_, String>(0)).unwrap();
         rows.map(|r| r.unwrap()).collect()
+    }
+
+    /// SQLite 3.54 + rusqlite's statement cache: a `col = ?` statement returned to the cache must
+    /// be reused as compiled, not re-prepared on every rebind (see `apply_pragmas`).
+    #[test]
+    fn cached_statements_are_not_reprepared_on_rebind() {
+        let conn = open_in_memory().unwrap();
+        // The shape of `state::supported_provenance`, the read the SLO-02 action row repeats.
+        let sql = "SELECT p.event_id, p.weight FROM state_provenance p JOIN event_log e ON e.id = p.event_id
+                   WHERE p.state_table = ?1 AND p.state_id = ?2 ORDER BY p.event_id";
+        for id in 0..20_i64 {
+            let mut stmt = conn.prepare_cached(sql).unwrap();
+            let mut rows = stmt.query(rusqlite::params!["people", id]).unwrap();
+            while rows.next().unwrap().is_some() {}
+        }
+        let stmt = conn.prepare_cached(sql).unwrap();
+        assert_eq!(stmt.get_status(rusqlite::StatementStatus::Run), 20);
+        assert_eq!(stmt.get_status(rusqlite::StatementStatus::RePrepare), 0);
     }
 
     #[test]
