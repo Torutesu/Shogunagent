@@ -113,7 +113,7 @@ impl DockHover {
         // this workspace pins MSRV 1.80.
         let spaced = self
             .last_query_ms
-            .map_or(true, |last| now_ms.saturating_sub(last) >= Self::QUERY_MS);
+            .is_none_or(|last| now_ms.saturating_sub(last) >= Self::QUERY_MS);
         if !spaced {
             return Step::Ignore;
         }

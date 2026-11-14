@@ -698,7 +698,7 @@ fn open_item(conn: &mut rusqlite::Savepoint<'_>, item: &Value, events: &[i64], n
 /// One `resolved` entry: closes an open row the user did not pin, with the quote that shows it.
 fn resolve(conn: &mut rusqlite::Savepoint<'_>, r: &Value, events: &[i64], now: i64) -> Result<bool, rusqlite::Error> {
     let Some((table, id)) = str_of(r, "id").and_then(row_ref) else { return Ok(false) };
-    if open_row(conn, table, id)?.map_or(true, |(pinned, _)| pinned) {
+    if open_row(conn, table, id)?.is_none_or(|(pinned, _)| pinned) {
         return Ok(false);
     }
     let event_id = r.get("event_id").and_then(Value::as_i64);
@@ -725,7 +725,7 @@ fn merge(conn: &mut rusqlite::Savepoint<'_>, d: &Value, now: i64) -> Result<bool
     if table != into_table || id == into || open_row(conn, table, into)?.is_none() {
         return Ok(false);
     }
-    if open_row(conn, table, id)?.map_or(true, |(pinned, _)| pinned) {
+    if open_row(conn, table, id)?.is_none_or(|(pinned, _)| pinned) {
         return Ok(false);
     }
     let t = table.as_str();

@@ -1243,7 +1243,7 @@ pub(crate) fn supported_provenance(
     while let Some(row) = rows.next()? {
         let source = row.get_ref(2)?.as_str()?;
         let quote = row.get_ref(3)?.as_str_or_null()?;
-        if quote.map_or(true, |quote| source_contains_quote(source, quote))
+        if quote.is_none_or(|quote| source_contains_quote(source, quote))
         {
             links.push((row.get(0)?, row.get(1)?));
             if links.len() == limit { break; }
@@ -1839,7 +1839,7 @@ mod first_source_tests {
     #[test]
     fn first_valid_source_stops_before_the_recapture_tail() {
         use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
-        let conn = crate::open_in_memory().unwrap();
+        let mut conn = crate::open_in_memory().unwrap();
         conn.execute_batch("INSERT INTO commitments(id,direction,description,status,confidence,base_confidence,created_at,updated_at,last_evidence_at)
             VALUES(1,'mine','Send deck','open',0.6,0.6,1,1,1);").unwrap();
         for id in 1..=500 {
@@ -1848,9 +1848,9 @@ mod first_source_tests {
         }
         let work = Arc::new(AtomicUsize::new(0));
         let count = Arc::clone(&work);
-        conn.progress_handler(1, Some(move || { count.fetch_add(1, Ordering::Relaxed); false }));
+        conn.progress_handler(1, Some(move || { count.fetch_add(1, Ordering::Relaxed); false })).unwrap();
         assert_eq!(super::get_commitment(&conn,1).unwrap().unwrap().first_event_id,Some(2));
-        conn.progress_handler(0, None::<fn()->bool>);
+        conn.progress_handler(0, None::<fn()->bool>).unwrap();
         assert!(work.load(Ordering::Relaxed)<500, "reader scanned the recapture tail: {} VM steps",work.load(Ordering::Relaxed));
         let complete = super::supported_provenance(&conn,super::StateTable::Commitments,1,usize::MAX).unwrap().unwrap();
         assert_eq!(complete.len(),499,"full search evidence keeps every valid link");

@@ -111,7 +111,7 @@ pub fn anchor_ts(item: &str, lines: &[(i64, &str)]) -> Option<i64> {
             .map(|index| lines[index].0)
             .unwrap_or(lines[start].0);
         // MSRV 1.80: `Option::is_none_or` is 1.82.
-        if best.map_or(true, |(score, _)| containment > score) {
+        if best.is_none_or(|(score, _)| containment > score) {
             best = Some((containment, anchor));
         }
     }

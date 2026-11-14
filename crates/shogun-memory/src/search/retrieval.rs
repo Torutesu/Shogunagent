@@ -68,7 +68,7 @@ const ARCHIVE_FTS_VM_CALLBACKS: usize = 1_000;
 /// BM25, also under a VM-step budget. `None` means callers must retain Warm results and report
 /// Warm lexical scope.
 pub fn fts_search_all_history_bounded(
-    conn: &Connection,
+    conn: &mut Connection,
     query: &str,
     limit: usize,
 ) -> Result<Option<Vec<i64>>, rusqlite::Error> {
@@ -77,7 +77,7 @@ pub fn fts_search_all_history_bounded(
 }
 
 pub(crate) fn fts_search_all_history_bounded_scored(
-    conn: &Connection,
+    conn: &mut Connection,
     query: &str,
     limit: usize,
 ) -> Result<Option<Vec<FtsSearchHit>>, rusqlite::Error> {
@@ -85,7 +85,7 @@ pub(crate) fn fts_search_all_history_bounded_scored(
         return Ok(Some(Vec::new()));
     };
 
-    let matches = with_archive_fts_budget(conn, || {
+    let matches = with_archive_fts_budget(conn, |conn| {
         let mut stmt =
             conn.prepare("SELECT rowid FROM event_fts WHERE event_fts MATCH ?1 LIMIT ?2")?;
         let ids = stmt
@@ -102,7 +102,7 @@ pub(crate) fn fts_search_all_history_bounded_scored(
         return Ok(None);
     }
 
-    with_archive_fts_budget(conn, || {
+    with_archive_fts_budget(conn, |conn| {
         let mut stmt = conn.prepare(
             "SELECT rowid, bm25(event_fts) FROM event_fts WHERE event_fts MATCH ?1
               ORDER BY rank, rowid ASC LIMIT ?2",
@@ -119,9 +119,12 @@ pub(crate) fn fts_search_all_history_bounded_scored(
     })
 }
 
+/// Runs `operation` under the archive VM-step budget. The progress handler is always removed
+/// before returning; failing to remove it is reported as the error, so a budget never outlives
+/// the operation it bounds.
 fn with_archive_fts_budget<T>(
-    conn: &Connection,
-    operation: impl FnOnce() -> Result<T, rusqlite::Error>,
+    conn: &mut Connection,
+    operation: impl FnOnce(&Connection) -> Result<T, rusqlite::Error>,
 ) -> Result<Option<T>, rusqlite::Error> {
     let callbacks = Arc::new(AtomicUsize::new(0));
     let handler_callbacks = Arc::clone(&callbacks);
@@ -131,9 +134,9 @@ fn with_archive_fts_budget<T>(
             handler_callbacks.fetch_add(1, Ordering::Relaxed) + 1
                 >= ARCHIVE_FTS_VM_CALLBACKS
         }),
-    );
-    let result = operation();
-    conn.progress_handler(0, None::<fn() -> bool>);
+    )?;
+    let result = operation(conn);
+    conn.progress_handler(0, None::<fn() -> bool>)?;
 
     match result {
         Ok(value) => Ok(Some(value)),
@@ -153,7 +156,7 @@ fn with_archive_fts_budget<T>(
 /// newest-docid order instead of BM25, so `LIMIT` stops the walk without scoring every match.
 /// If the VM budget is exhausted, the safely collected prefix is returned.
 pub fn fts_search_fallback_bounded(
-    conn: &Connection,
+    conn: &mut Connection,
     query: &str,
     range: SearchRange,
     limit: usize,
@@ -173,8 +176,10 @@ pub fn fts_search_fallback_bounded(
             handler_callbacks.fetch_add(1, Ordering::Relaxed) + 1
                 >= ARCHIVE_FTS_VM_CALLBACKS
         }),
-    );
+    )?;
+    let conn_ref: &Connection = conn;
     let result = (|| {
+        let conn = conn_ref;
         let min_id = match conn.query_row(
             "SELECT id FROM event_log
               WHERE ts >= ?1 AND ts < ?2 ORDER BY id ASC LIMIT 1",
@@ -209,7 +214,7 @@ pub fn fts_search_fallback_bounded(
             }
         }
     })();
-    conn.progress_handler(0, None::<fn() -> bool>);
+    conn.progress_handler(0, None::<fn() -> bool>)?;
 
     match result {
         Err(error) if is_operation_interrupted(&error) => Ok(Vec::new()),
@@ -585,7 +590,7 @@ pub fn fuse_and_hydrate(
             .ok();
         if row
             .as_ref()
-            .is_some_and(|hit| range.map_or(true, |range| range.contains(hit.ts)))
+            .is_some_and(|hit| range.is_none_or(|range| range.contains(hit.ts)))
         {
             hits.extend(row);
             if hits.len() == limit {

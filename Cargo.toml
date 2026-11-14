@@ -31,7 +31,7 @@ members = [
 
 [workspace.package]
 edition = "2021"
-rust-version = "1.80"
+rust-version = "1.92"
 license = "Apache-2.0"
 publish = false
 
@@ -61,3 +61,8 @@ inherits = "release"
 lto = false
 codegen-units = 16
 incremental = true
+
+# Temporary: refinery-core with its rusqlite bound widened to 0.42 (RUSTSEC-2026-0459/0502).
+# See vendor/refinery-core/VENDORED.md for why and when to remove it.
+[patch.crates-io]
+refinery-core = { path = "vendor/refinery-core" }

@@ -273,7 +273,7 @@ impl VisualRecallWidening {
         let in_bounds = |days: u32| (1..=VISUAL_RECALL_MAX_RETENTION_DAYS).contains(&days);
         self.widens()
             && in_bounds(self.previous_retention_days)
-            && self.retention_days.map_or(true, in_bounds)
+            && self.retention_days.is_none_or(in_bounds)
     }
 }
 

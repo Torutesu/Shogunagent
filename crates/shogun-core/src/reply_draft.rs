@@ -445,7 +445,7 @@ fn blank_runs(chars: &[char]) -> Vec<String> {
         }
         let len = end - i + 1;
         // Not `is_none_or`: that is stable from 1.82 and this workspace pins MSRV 1.80.
-        let bounded = |idx: Option<&char>| idx.map_or(true, |ch| !ch.is_ascii_alphanumeric());
+        let bounded = |idx: Option<&char>| idx.is_none_or(|ch| !ch.is_ascii_alphanumeric());
         if len >= 3 && bounded(i.checked_sub(1).and_then(|k| chars.get(k))) && bounded(chars.get(end + 1))
         {
             out.push(chars[i..=end].iter().collect());

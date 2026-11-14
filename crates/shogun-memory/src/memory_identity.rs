@@ -105,7 +105,7 @@ pub fn stable_title(title: &str) -> String {
     // them adjacent; collapse the run so the title reads as if the counter had never been there.
     let mut cleaned: Vec<&str> = Vec::with_capacity(kept.len());
     for token in kept {
-        if is_separator(token) && cleaned.last().map_or(true, |prev| is_separator(prev)) {
+        if is_separator(token) && cleaned.last().is_none_or(|prev| is_separator(prev)) {
             continue;
         }
         cleaned.push(token);
@@ -306,7 +306,7 @@ pub fn quote_anchor(quote: &str) -> Option<String> {
     for word in identity.split_whitespace() {
         let core = word.trim_matches(|c: char| !c.is_alphanumeric());
         if core.chars().count() >= MIN_ANCHOR_CHARS
-            && best.map_or(true, |b| core.chars().count() > b.chars().count())
+            && best.is_none_or(|b| core.chars().count() > b.chars().count())
         {
             best = Some(core);
         }

@@ -488,7 +488,7 @@ pub(crate) fn search_documents(
             };
             let in_range = match (start, end) {
                 (Some(start), Some(end)) => {
-                    to_ms.map_or(true, |to| start < to) && from_ms.map_or(true, |from| end > from)
+                    to_ms.is_none_or(|to| start < to) && from_ms.is_none_or(|from| end > from)
                 }
                 _ => true,
             };

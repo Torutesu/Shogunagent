@@ -119,7 +119,7 @@ mod tests {
                 assert!(COUNT_BUCKETS.contains(&p[key].as_str().unwrap()), "{key}: {}", p[key]);
             }
             let pct = p["token_reduction_pct"].as_u64().unwrap();
-            assert!(pct <= 100 && pct % 5 == 0, "{pct}");
+            assert!(pct <= 100 && pct.is_multiple_of(5), "{pct}");
         }
     }
 

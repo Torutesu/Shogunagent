@@ -138,7 +138,7 @@ async fn prepare_handshake(
     let permit = TRACE_SLOTS.acquire().await.map_err(|_| ())?;
     tokio::task::spawn_blocking(move || {
         let _permit = permit;
-        let personal_allowed = endpoint.consent.as_ref().map_or(true, |consent| consent());
+        let personal_allowed = endpoint.consent.as_ref().is_none_or(|consent| consent());
         let (url, has_keyterms) = endpoint.choose(personal_allowed);
         // Issue #831: the hints ride the handshake, so no row means no connection.
         super::record_keyterm_attempt(trace.as_ref(), "meeting_asr", has_keyterms)
@@ -215,7 +215,7 @@ impl Buffer {
                 let keep = gap.min(MAX_SAMPLES as u64) as usize;
                 let evict = (self.pcm.len() + keep).saturating_sub(MAX_SAMPLES);
                 self.pcm.drain(..evict);
-                self.pcm.extend(std::iter::repeat(0).take(keep));
+                self.pcm.extend(std::iter::repeat_n(0, keep));
                 self.end = offset;
                 self.start = self.end - self.pcm.len() as u64;
                 self.status.dropped_samples += gap + evict as u64;
@@ -427,7 +427,7 @@ impl MeetingLive {
             while let Some(result) = self.try_recv() {
                 emit(result);
             }
-            if self.worker.as_ref().map_or(true, |w| w.is_finished()) {
+            if self.worker.as_ref().is_none_or(|w| w.is_finished()) {
                 break;
             }
             std::thread::sleep(Duration::from_millis(10));

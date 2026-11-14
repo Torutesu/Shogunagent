@@ -155,7 +155,7 @@ impl OfferGate {
         occurrence_id: Option<i64>,
         now: i64,
     ) -> bool {
-        self.calls.get(bundle_id).map_or(true, |call| {
+        self.calls.get(bundle_id).is_none_or(|call| {
             let different = identity
                 .zip(call.identity.as_deref())
                 .is_some_and(|(new, old)| new != old)
@@ -211,7 +211,7 @@ impl OfferGate {
                 ),
                 CallSurface::Native => {
                     o.mic_open
-                        || call.mic_closed_since.map_or(true, |since| {
+                        || call.mic_closed_since.is_none_or(|since| {
                             o.now.saturating_sub(since) < super::detect::MIC_QUIET_AFTER_URL_LEFT_MS
                         })
                 }

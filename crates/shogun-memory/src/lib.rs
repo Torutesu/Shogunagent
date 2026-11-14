@@ -135,7 +135,7 @@ pub enum MemoryError {
     /// divergent name/checksum, a version this build does not embed, or a gap below the newest
     /// applied one). Carries the version only, never a stored name or checksum.
     #[error("migration history does not match this build at V{0}; memory left unchanged")]
-    HistoryMismatch(u32),
+    HistoryMismatch(refinery::SchemaVersion),
 }
 
 /// Apply the crash-safety pragmas (NFR-REL-01). `wal` is skipped for in-memory databases,
@@ -158,6 +158,13 @@ fn apply_pragmas(conn: &Connection, wal: bool) -> Result<(), rusqlite::Error> {
     // none (600 MB store copy, docs/migrations/V87-rollback.md). Negative = KiB.
     // ponytail: fixed size; raise it if larger stores show misses on repeated lookups again.
     conn.pragma_update(None, "cache_size", -16_384)?;
+    // Keep cached statements cached. Since SQLite 3.54 every `col = ?` term marks its parameter
+    // "re-prepare on rebind", and `sqlite3_clear_bindings` (which rusqlite's statement cache calls
+    // whenever a statement goes back to the cache) then expires the statement, so every
+    // `prepare_cached` re-prepared from scratch: 2-4x on the state reads (SLO-02). The query
+    // planner stability guarantee turns those value-dependent re-plans off. Nothing here relies on
+    // them: no ANALYZE runs (no STAT4 data), and the `LIKE ?` filters have no NOCASE index to use.
+    conn.set_db_config(rusqlite::config::DbConfig::SQLITE_DBCONFIG_ENABLE_QPSG, true)?;
     Ok(())
 }
 
@@ -198,7 +205,7 @@ fn migrate_and_check(conn: &mut Connection) -> Result<(), MemoryError> {
         [],
         |r| r.get(0),
     )?;
-    let applied: Vec<u32> = if has_history {
+    let applied: Vec<refinery::SchemaVersion> = if has_history {
         catch_history_panic(|| embedded::runner().get_applied_migrations(conn))??
             .iter()
             .map(|m| m.version())
@@ -206,7 +213,7 @@ fn migrate_and_check(conn: &mut Connection) -> Result<(), MemoryError> {
     } else {
         Vec::new()
     };
-    let pending: Vec<u32> = embedded::runner()
+    let pending: Vec<refinery::SchemaVersion> = embedded::runner()
         .get_migrations()
         .iter()
         .map(|m| m.version())
@@ -405,7 +412,7 @@ pub fn is_plaintext_db(path: impl AsRef<Path>) -> bool {
 /// has on disk. For tests and tooling that exercise the upgrade path (the principal import, E2-T6);
 /// never a product entry point.
 #[doc(hidden)]
-pub fn open_plaintext_at_version(path: impl AsRef<Path>, version: u32) -> Result<Connection, MemoryError> {
+pub fn open_plaintext_at_version(path: impl AsRef<Path>, version: refinery::SchemaVersion) -> Result<Connection, MemoryError> {
     vector::register_extension();
     let mut conn = Connection::open(path)?;
     apply_pragmas(&conn, true)?;
@@ -602,6 +609,24 @@ mod tests {
             .unwrap();
         let rows = stmt.query_map([], |r| r.get::<_, String>(0)).unwrap();
         rows.map(|r| r.unwrap()).collect()
+    }
+
+    /// SQLite 3.54 + rusqlite's statement cache: a `col = ?` statement returned to the cache must
+    /// be reused as compiled, not re-prepared on every rebind (see `apply_pragmas`).
+    #[test]
+    fn cached_statements_are_not_reprepared_on_rebind() {
+        let conn = open_in_memory().unwrap();
+        // The shape of `state::supported_provenance`, the read the SLO-02 action row repeats.
+        let sql = "SELECT p.event_id, p.weight FROM state_provenance p JOIN event_log e ON e.id = p.event_id
+                   WHERE p.state_table = ?1 AND p.state_id = ?2 ORDER BY p.event_id";
+        for id in 0..20_i64 {
+            let mut stmt = conn.prepare_cached(sql).unwrap();
+            let mut rows = stmt.query(rusqlite::params!["people", id]).unwrap();
+            while rows.next().unwrap().is_some() {}
+        }
+        let stmt = conn.prepare_cached(sql).unwrap();
+        assert_eq!(stmt.get_status(rusqlite::StatementStatus::Run), 20);
+        assert_eq!(stmt.get_status(rusqlite::StatementStatus::RePrepare), 0);
     }
 
     #[test]

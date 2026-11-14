@@ -212,7 +212,7 @@ pub const fn thinking_max_beats() -> u64 {
 
 /// The asset for beat `n` (0-based): a higher tick and a lower tock, alternating like a clock.
 pub fn thinking_asset(beat: u64) -> &'static str {
-    if beat % 2 == 0 {
+    if beat.is_multiple_of(2) {
         "thinking-tick"
     } else {
         "thinking-tock"

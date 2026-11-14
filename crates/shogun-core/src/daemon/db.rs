@@ -205,19 +205,40 @@ pub(super) struct HotRebuilder {
     health: std::sync::Weak<crate::memory_health::MemoryHealth>,
 }
 
+/// Owns the connection lock for the duration of a hot rebuild, so the progress handler it
+/// installs is always removed before the lock is released (registering a handler needs
+/// `&mut Connection`, which a borrowed guard could not provide).
 struct HotProgressGuard<'a> {
-    conn: &'a Connection,
+    conn: std::sync::MutexGuard<'a, Connection>,
     pub(super) active: Option<Arc<std::sync::atomic::AtomicBool>>,
+}
+
+impl std::ops::Deref for HotProgressGuard<'_> {
+    type Target = Connection;
+
+    fn deref(&self) -> &Connection {
+        &self.conn
+    }
+}
+
+impl HotProgressGuard<'_> {
+    /// Remove the progress handler and clear the active flag, keeping the connection lock.
+    /// Idempotent; `drop` calls it too.
+    fn release_handler(&mut self) {
+        use std::sync::atomic::Ordering;
+
+        // Removing a handler only clears SQLite client data; nothing useful can be done with a
+        // failure here, and the next registration replaces the handler anyway.
+        let _ = self.conn.progress_handler(0, None::<fn() -> bool>);
+        if let Some(active) = self.active.take() {
+            active.store(false, Ordering::Release);
+        }
+    }
 }
 
 impl Drop for HotProgressGuard<'_> {
     fn drop(&mut self) {
-        use std::sync::atomic::Ordering;
-
-        self.conn.progress_handler(0, None::<fn() -> bool>);
-        if let Some(active) = &self.active {
-            active.store(false, Ordering::Release);
-        }
+        self.release_handler();
     }
 }
 
@@ -338,19 +359,38 @@ impl HotRebuilder {
             }
         };
         let progress_cancel = cancel.clone();
-        conn.progress_handler(
-            1_000,
-            Some(move || {
-                progress_cancel.load(Ordering::Acquire) || std::time::Instant::now() >= deadline
-            }),
-        );
+        let mut progress = HotProgressGuard { conn, active: None };
+        if progress
+            .conn
+            .progress_handler(
+                1_000,
+                Some(move || {
+                    progress_cancel.load(Ordering::Acquire)
+                        || std::time::Instant::now() >= deadline
+                }),
+            )
+            .is_err()
+        {
+            drop(progress);
+            replace_hot_rebuild_status(
+                &status,
+                &phase,
+                &health,
+                &clock,
+                HotStatus {
+                    phase: HotPhase::Failed,
+                    started_at_ms: Some(started_at_ms),
+                    finished_at_ms: Some(clock()),
+                    elapsed_ms: started.elapsed().as_millis() as u64,
+                    ..HotStatus::default()
+                },
+            );
+            return false;
+        }
         if let Some(active) = &active {
             active.store(true, Ordering::Release);
         }
-        let progress = HotProgressGuard {
-            conn: &conn,
-            active,
-        };
+        progress.active = active;
         let mut repaired_poison = false;
         let mut hot = loop {
             match hot_arc.try_lock() {
@@ -383,10 +423,12 @@ impl HotRebuilder {
                 }
             }
         };
-        let rebuilt = hot.rebuild_from_warm_in_place(&conn, clock(), || {
+        let rebuilt = hot.rebuild_from_warm_in_place(&progress, clock(), || {
             cancel.load(Ordering::Acquire) || std::time::Instant::now() >= deadline
         });
-        drop(progress);
+        // The handler goes now; the connection lock is held until the status is published,
+        // as before (lock order stays `conn`, then `hot`).
+        progress.release_handler();
         let success = matches!(rebuilt, Ok(true));
         if !success {
             hot.clear();
@@ -424,7 +466,7 @@ impl HotRebuilder {
                 folded_count: counts.2,
             },
         );
-        drop(conn);
+        drop(progress);
         success
     }
 }

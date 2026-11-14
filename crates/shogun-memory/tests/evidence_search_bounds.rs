@@ -23,6 +23,8 @@
 //! ```text
 //! cargo test -p shogun-memory --release --test search_slo -- --ignored --nocapture
 //! ```
+
+#![allow(clippy::expect_used)]
 #![allow(clippy::unwrap_used)]
 
 mod support;
@@ -61,7 +63,7 @@ struct Work {
 /// Run one search and count its work. Both counters are exact and deterministic for a given
 /// SQLite build, schema and data, unlike elapsed time: the progress handler fires on every VM
 /// instruction, the authorizer once per SELECT (and sub-select) as each statement is prepared.
-fn search(conn: &rusqlite::Connection, limit: usize) -> Work {
+fn search(conn: &mut rusqlite::Connection, limit: usize) -> Work {
     let vm = Arc::new(AtomicU64::new(0));
     let selects = Arc::new(AtomicU64::new(0));
     let vm_counter = Arc::clone(&vm);
@@ -72,13 +74,15 @@ fn search(conn: &rusqlite::Connection, limit: usize) -> Work {
             vm_counter.fetch_add(1, Ordering::Relaxed);
             false
         }),
-    );
+    )
+    .expect("install VM counter");
     conn.authorizer(Some(move |context: AuthContext<'_>| {
         if matches!(context.action, AuthAction::Select) {
             select_counter.fetch_add(1, Ordering::Relaxed);
         }
         Authorization::Allow
-    }));
+    }))
+    .expect("install SELECT counter");
     let result = search_federated(
         conn,
         QUERY,
@@ -88,8 +92,10 @@ fn search(conn: &rusqlite::Connection, limit: usize) -> Work {
         limit,
     )
     .unwrap();
-    conn.progress_handler(0, None::<fn() -> bool>);
-    conn.authorizer(None::<fn(AuthContext<'_>) -> Authorization>);
+    conn.progress_handler(0, None::<fn() -> bool>)
+        .expect("remove VM counter");
+    conn.authorizer(None::<fn(AuthContext<'_>) -> Authorization>)
+        .expect("remove SELECT counter");
     Work {
         result,
         vm: vm.load(Ordering::Relaxed),
@@ -119,15 +125,15 @@ fn evidence_validation_work_is_capped_by_candidates_and_linear_in_evidence() {
         .map(|ordinal| evidence_heavy_meeting(&mut conn, ordinal, STEP))
         .collect();
     optimize(&conn);
-    let mut steps = vec![search(&conn, LIMIT)];
+    let mut steps = vec![search(&mut conn, LIMIT)];
     for from in [STEP, 2 * STEP] {
         for (ordinal, &session) in sessions.iter().enumerate() {
             add_session_evidence(&mut conn, session, ordinal, from, STEP);
         }
         optimize(&conn);
-        steps.push(search(&conn, LIMIT));
+        steps.push(search(&mut conn, LIMIT));
     }
-    let half = search(&conn, LIMIT / 2);
+    let half = search(&mut conn, LIMIT / 2);
     let [at_10, at_20, at_30] = [&steps[0], &steps[1], &steps[2]];
     let rows = [at_10, at_20, at_30].map(|work| evidence_rows(&work.result));
     eprintln!(

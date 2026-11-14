@@ -383,7 +383,7 @@ pub fn mentions_name(text: &str, name: &str) -> bool {
         let end = at + name.len();
         let before = text[..at].chars().next_back();
         let after = text[end..].chars().next();
-        let boundary = |c: Option<char>| c.map_or(true, |c| !c.is_alphanumeric());
+        let boundary = |c: Option<char>| c.is_none_or(|c| !c.is_alphanumeric());
         if boundary(before) && boundary(after) {
             return true;
         }

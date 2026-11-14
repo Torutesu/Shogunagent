@@ -160,7 +160,10 @@ fn done_is_read_from_the_structure_record_on_the_shipped_engine() {
     let conn = crate::open_in_memory().unwrap();
     // The measurements, and the V1 structure format decoded here, are for this engine.
     let version: String = conn.query_row("SELECT sqlite_version()", [], |r| r.get(0)).unwrap();
-    assert_eq!(version, "3.39.4", "re-verify the completion signal on a new SQLite");
+    // Re-verified on 3.54.1 (SQLCipher 4.20.0): `fts5StructureWrite` still writes V1 unless the
+    // table is `contentless_delete`, the merge/optimize code is unchanged from 3.39.4, and the
+    // decoder only gained a `pgnoLast > FTS5_MAX_PGNO` corruption check.
+    assert_eq!(version, "3.54.1", "re-verify the completion signal on a new SQLite");
 
     insert_events(&conn, &corpus(120));
     reindex_old_rows(&conn, 3);

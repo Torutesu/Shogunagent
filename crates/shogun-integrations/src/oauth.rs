@@ -361,7 +361,7 @@ pub fn parse_notion_token_response(body: &str, now_ms: i64, prior_refresh: Optio
     };
     if response.get("error").is_some()
         || response.get("token_type").and_then(serde_json::Value::as_str).is_some_and(|t| !t.eq_ignore_ascii_case("bearer"))
-        || response.get("bot_id").and_then(serde_json::Value::as_str).map_or(true, str::is_empty)
+        || response.get("bot_id").and_then(serde_json::Value::as_str).is_none_or(str::is_empty)
     {
         return Err(INCOMPATIBLE.into());
     }
@@ -500,7 +500,7 @@ pub fn parse_token_response_for(
             || response
                 .get("token_type")
                 .and_then(serde_json::Value::as_str)
-                .map_or(true, |kind| !kind.eq_ignore_ascii_case("bearer"))
+                .is_none_or(|kind| !kind.eq_ignore_ascii_case("bearer"))
             || ttl.is_none()
             || !token("access_token")
             || !token("refresh_token")
@@ -513,8 +513,8 @@ pub fn parse_token_response_for(
         let response: serde_json::Value = serde_json::from_str(body).map_err(|_| "invalid token response")?;
         if response.get("error").is_some()
             || response.get("token_type").and_then(serde_json::Value::as_str) != Some("bearer")
-            || response.get("expires_in").and_then(serde_json::Value::as_i64).map_or(true, |ttl| ttl <= 0)
-            || response.get("refresh_token").and_then(serde_json::Value::as_str).map_or(true, str::is_empty)
+            || response.get("expires_in").and_then(serde_json::Value::as_i64).is_none_or(|ttl| ttl <= 0)
+            || response.get("refresh_token").and_then(serde_json::Value::as_str).is_none_or(str::is_empty)
         {
             return Err("GitHub OAuth token response is incompatible".into());
         }
@@ -547,7 +547,7 @@ pub fn parse_token_response_for(
             return Err("Slack rotating token response has no expiry".into());
         }
         if let Some(expiry) = payload.get("expires_in") {
-            if expiry.as_i64().map_or(true, |seconds| {
+            if expiry.as_i64().is_none_or(|seconds| {
                 seconds <= 0
                     || seconds
                         .checked_mul(1000)
@@ -556,7 +556,7 @@ pub fn parse_token_response_for(
             }) || payload
                 .get("refresh_token")
                 .and_then(serde_json::Value::as_str)
-                .map_or(true, |value| {
+                .is_none_or(|value| {
                     value.is_empty()
                         || value.len() > 8192
                         || !value.bytes().all(|byte| byte.is_ascii_graphic())

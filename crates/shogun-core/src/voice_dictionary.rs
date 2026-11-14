@@ -620,8 +620,7 @@ mod tests {
 
     #[test]
     fn aliases_beyond_token_bound_are_not_indexed() {
-        let alias = std::iter::repeat("word")
-            .take(MAX_ALIAS_TOKENS + 1)
+        let alias = std::iter::repeat_n("word", MAX_ALIAS_TOKENS + 1)
             .collect::<Vec<_>>()
             .join(" ");
         let dictionary = VoiceDictionary::new(vec![entry("Unsafe", &[&alias])]);

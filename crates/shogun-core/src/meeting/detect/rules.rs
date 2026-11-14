@@ -62,7 +62,7 @@ fn browser_lacks_meeting_proof(ctx: &DetectionCtx<'_>) -> bool {
     ctx.is_browser
         && !ctx.has_meet_url
         && !ctx.has_weak_meeting_signal
-        && ctx.page_host.map_or(true, str::is_empty)
+        && ctx.page_host.is_none_or(str::is_empty)
 }
 
 /// Apply FR-MT-04 policy on top of raw signals, then score.
@@ -467,7 +467,7 @@ pub fn huddle_session_present(
     if mic_open {
         return true;
     }
-    mic_closed_since_ms.map_or(true, |since| {
+    mic_closed_since_ms.is_none_or(|since| {
         now.saturating_sub(since) < MIC_QUIET_AFTER_URL_LEFT_MS
     })
 }
@@ -491,7 +491,7 @@ pub fn meet_url_session_present(
     if mic_open {
         return true;
     }
-    mic_closed_since_ms.map_or(true, |since| {
+    mic_closed_since_ms.is_none_or(|since| {
         now.saturating_sub(since) < MIC_QUIET_AFTER_URL_LEFT_MS
     })
 }

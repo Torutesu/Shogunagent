@@ -71,7 +71,7 @@ pub fn persisted_verifier_bytes(verifier: &str) -> Result<[u8; 32], String> {
         return Err("invalid token verifier".into());
     }
     let mut out = [0u8; 32];
-    for (index, pair) in hex.as_bytes().chunks_exact(2).enumerate() {
+    for (index, pair) in hex.as_bytes().as_chunks::<2>().0.iter().enumerate() {
         let high = (pair[0] as char)
             .to_digit(16)
             .ok_or_else(|| "invalid token verifier".to_string())?;

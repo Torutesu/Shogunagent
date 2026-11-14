@@ -890,7 +890,7 @@ impl<T: IntegrationTransport> ConnectorRuntime<T> {
             .filter(|s| !self.keychain_locked.contains(s))
             .filter(|&s| s.is_released(self.highest_released))
             .filter(|&s| matches!(self.registry.state(s), ConnState::Connected { .. } | ConnState::NeedsReauth { .. }))
-            .filter(|&s| self.registry.freshness_ms(s, now_ms).map_or(true, |f| f >= interval_ms))
+            .filter(|&s| self.registry.freshness_ms(s, now_ms).is_none_or(|f| f >= interval_ms))
             .collect()
     }
 

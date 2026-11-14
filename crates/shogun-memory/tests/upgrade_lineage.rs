@@ -75,7 +75,7 @@ fn create_encrypted_at(path: &Path, version: u32) -> TestResult {
     conn.pragma_update(None, "synchronous", "NORMAL")?;
     conn.pragma_update(None, "foreign_keys", "ON")?;
     embedded::migrations::runner()
-        .set_target(refinery::Target::Version(version))
+        .set_target(refinery::Target::Version(refinery::SchemaVersion::try_from(version)?))
         .run(&mut conn)?;
     assert_eq!(schema_version(&conn)?, Some(version));
     Ok(())
@@ -381,7 +381,7 @@ fn row_counts(conn: &Connection) -> rusqlite::Result<Vec<(String, i64)>> {
 fn every_version_upgrades_atomically_to_latest() -> TestResult {
     // The embedded versions in order. Every one has a successor here except the newest; a gap
     // in the numbering (a version taken on another branch and merged later) is stepped over.
-    let mut versions: Vec<u32> = embedded::migrations::runner().get_migrations().iter().map(|m| m.version()).collect();
+    let mut versions: Vec<u32> = embedded::migrations::runner().get_migrations().iter().map(|m| u32::try_from(m.version())).collect::<Result<_, _>>()?;
     versions.sort_unstable();
     assert_eq!(versions.last().copied(), Some(LATEST_SCHEMA_VERSION));
     for pair in versions.windows(2) {
@@ -629,7 +629,7 @@ fn store_from_newer_binary_fails_closed_without_writing() -> TestResult {
     match &err {
         MemoryError::Migration(e) => {
             assert!(
-                matches!(e.kind(), Kind::MissingVersion(m) if m.version() == LATEST_SCHEMA_VERSION + 1),
+                matches!(e.kind(), Kind::MissingVersion(m) if i64::from(m.version()) == i64::from(LATEST_SCHEMA_VERSION + 1)),
                 "expected MissingVersion(LATEST+1), got {}",
                 e.kind()
             );
@@ -654,7 +654,7 @@ fn verify_history_accepts_a_clean_store() -> TestResult {
 /// write and without echoing a stored value.
 #[test]
 fn verify_history_refuses_what_refinery_refuses_without_writing() -> TestResult {
-    let mismatch = |at: u32| move |e: &MemoryError| matches!(e, MemoryError::HistoryMismatch(v) if *v == at);
+    let mismatch = |at: i32| move |e: &MemoryError| matches!(e, MemoryError::HistoryMismatch(v) if *v == at);
     let unreadable = |e: &MemoryError| matches!(e, MemoryError::MigrationHistoryUnreadable(_));
     let refinery = |e: &MemoryError| matches!(e, MemoryError::Migration(_));
     type Expected<'a> = &'a dyn Fn(&MemoryError) -> bool;

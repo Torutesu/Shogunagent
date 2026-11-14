@@ -29,7 +29,7 @@ fn routed_tool(routed: &Routed) -> Option<Tool> {
 /// MCP face applies too.
 fn scope_allows_routed(routed: &Routed, scope: TokenScope) -> bool {
     // `map_or(true, ..)`: the workspace MSRV (1.80) predates `is_none_or`.
-    routed_tool(routed).map_or(true, |tool| scope_allows(scope, tool))
+    routed_tool(routed).is_none_or(|tool| scope_allows(scope, tool))
 }
 
 /// The token of an `Authorization: Bearer <token>` header. The scheme name is case-insensitive

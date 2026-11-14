@@ -634,7 +634,7 @@ fn occurrences(hay: &str, needle: &str, short_word: bool) -> f64 {
             let before = hay[..at].chars().next_back();
             let after = hay[at + needle.len()..].chars().next();
             let boundary =
-                |character: Option<char>| character.map_or(true, |c| script(c) != Script::Latin);
+                |character: Option<char>| character.is_none_or(|c| script(c) != Script::Latin);
             if !(boundary(before) && boundary(after)) {
                 continue;
             }

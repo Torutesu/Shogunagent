@@ -67,7 +67,7 @@ fn validate_discovery(resource: &Value, metadata: &Value) -> Result<(), String> 
         || resource
             .get("authorization_servers")
             .and_then(Value::as_array)
-            .map_or(true, |servers| servers != &[json!(ORIGIN)])
+            .is_none_or(|servers| servers != &[json!(ORIGIN)])
         || metadata.get("issuer").and_then(Value::as_str) != Some(ORIGIN)
     {
         return Err("Notion OAuth issuer is unsupported".into());
@@ -201,7 +201,7 @@ fn validate_granola_discovery(resource: &Value, metadata: &Value) -> Result<(), 
         || resource
             .get("authorization_servers")
             .and_then(Value::as_array)
-            .map_or(true, |servers| servers != &[json!(GRANOLA_ISSUER)])
+            .is_none_or(|servers| servers != &[json!(GRANOLA_ISSUER)])
         || metadata.get("issuer").and_then(Value::as_str) != Some(GRANOLA_ISSUER)
     {
         return Err("Granola OAuth issuer is unsupported".into());

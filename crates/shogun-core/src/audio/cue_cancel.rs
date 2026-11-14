@@ -40,7 +40,7 @@ pub fn reference_from_wav(bytes: &[u8]) -> Option<Vec<f32>> {
             };
             let samples: Vec<f32> = bytes
                 .get(body..body + len)?
-                .chunks_exact(2)
+                .as_chunks::<2>().0.iter()
                 .map(|s| i16::from_le_bytes([s[0], s[1]]) as f32 / 32_768.0)
                 .collect();
             return Some(resample::to_16k_mono(
