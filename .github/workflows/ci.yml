@@ -202,8 +202,8 @@ jobs:
           pnpm --filter @shogunagent/conformance test
       # Debug build on purpose: the plan-file and licence-key overrides the throwaway sidecar
       # needs exist only in debug builds. Temp store, random keys, loopback only.
-      - name: build the sidecar (shogun-api) and the store fixture
-        run: cargo build --locked -p shogun-core --features daemon-server --bin shogun-api --example conformance_store
+      - name: build the sidecar (shogun-api)
+        run: cargo build --locked -p shogun-core --features daemon-server --bin shogun-api
       - name: run the suite against the sidecar (writes, MRTR and approvals included)
         run: pnpm --filter @shogunagent/conformance local
 

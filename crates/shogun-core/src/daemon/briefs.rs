@@ -312,8 +312,12 @@ pub fn brief_input_window(created_at_ms: i64, cycle_from: i64, cycle_to: i64) ->
 fn day_start_in_zone<Tz: chrono::TimeZone>(now_ms: i64, days: i64, zone: &Tz) -> Option<i64> {
     let today = zone.timestamp_millis_opt(now_ms).single()?.date_naive();
     let date = today.checked_add_signed(chrono::Duration::try_days(days)?)?;
-    zone.from_local_datetime(&date.and_hms_opt(0, 0, 0)?)
-        .earliest()
+    let midnight = date.and_hms_opt(0, 0, 0)?;
+    // Where DST starts at midnight (America/Santiago, Africa/Cairo) 00:00 does not exist and the
+    // day begins at the first valid instant after the gap, as it does for SQLite's `localtime`.
+    // Without this the caller fell back to UTC days for those dates.
+    (0..=4 * 60)
+        .find_map(|minute| zone.from_local_datetime(&(midnight + chrono::Duration::minutes(minute))).earliest())
         .map(|time| time.timestamp_millis())
 }
 
@@ -322,6 +326,61 @@ fn day_start_in_zone<Tz: chrono::TimeZone>(now_ms: i64, days: i64, zone: &Tz) ->
 mod calendar_regression_tests {
     use super::*;
     use chrono::TimeZone;
+
+    /// UTC-3 until 2026-09-06 00:00 local, then UTC-2: midnight that day does not exist, as on
+    /// America/Santiago's spring-forward.
+    #[derive(Clone, Copy, Debug)]
+    struct GapAtMidnight;
+
+    impl GapAtMidnight {
+        fn switch_local() -> chrono::NaiveDateTime {
+            chrono::NaiveDate::from_ymd_opt(2026, 9, 6).unwrap().and_hms_opt(0, 0, 0).unwrap()
+        }
+        fn before() -> chrono::FixedOffset {
+            chrono::FixedOffset::west_opt(3 * 3600).unwrap()
+        }
+        fn after() -> chrono::FixedOffset {
+            chrono::FixedOffset::west_opt(2 * 3600).unwrap()
+        }
+    }
+
+    impl chrono::TimeZone for GapAtMidnight {
+        type Offset = chrono::FixedOffset;
+        fn from_offset(_: &chrono::FixedOffset) -> Self {
+            GapAtMidnight
+        }
+        fn offset_from_local_date(&self, local: &chrono::NaiveDate) -> chrono::LocalResult<chrono::FixedOffset> {
+            self.offset_from_local_datetime(&local.and_hms_opt(12, 0, 0).unwrap())
+        }
+        fn offset_from_local_datetime(&self, local: &chrono::NaiveDateTime) -> chrono::LocalResult<chrono::FixedOffset> {
+            let switch = Self::switch_local();
+            if *local < switch {
+                chrono::LocalResult::Single(Self::before())
+            } else if *local < switch + chrono::Duration::hours(1) {
+                chrono::LocalResult::None
+            } else {
+                chrono::LocalResult::Single(Self::after())
+            }
+        }
+        fn offset_from_utc_date(&self, utc: &chrono::NaiveDate) -> chrono::FixedOffset {
+            self.offset_from_utc_datetime(&utc.and_hms_opt(12, 0, 0).unwrap())
+        }
+        fn offset_from_utc_datetime(&self, utc: &chrono::NaiveDateTime) -> chrono::FixedOffset {
+            // 2026-09-06 00:00 at UTC-3 is 03:00 UTC.
+            if *utc < Self::switch_local() + chrono::Duration::hours(3) { Self::before() } else { Self::after() }
+        }
+    }
+
+    #[test]
+    fn a_day_whose_midnight_falls_in_a_dst_gap_starts_after_the_gap() {
+        // 2026-09-06 12:00 local (UTC-2) is 14:00 UTC.
+        let now = chrono::Utc.with_ymd_and_hms(2026, 9, 6, 14, 0, 0).unwrap().timestamp_millis();
+        // The day starts at 01:00 UTC-2 = 03:00 UTC, not at a UTC midnight.
+        assert_eq!(day_start_in_zone(now, 0, &GapAtMidnight), Some(chrono::Utc.with_ymd_and_hms(2026, 9, 6, 3, 0, 0).unwrap().timestamp_millis()));
+        // The days on either side still start at their own midnights.
+        assert_eq!(day_start_in_zone(now, -1, &GapAtMidnight), Some(chrono::Utc.with_ymd_and_hms(2026, 9, 5, 3, 0, 0).unwrap().timestamp_millis()));
+        assert_eq!(day_start_in_zone(now, 1, &GapAtMidnight), Some(chrono::Utc.with_ymd_and_hms(2026, 9, 7, 2, 0, 0).unwrap().timestamp_millis()));
+    }
 
     #[test]
     fn server_days_follow_non_utc_midnights_on_both_sides_of_utc() {
