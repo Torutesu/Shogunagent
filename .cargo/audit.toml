@@ -1,12 +1,3 @@
 # cargo audit (ci.yml `rust-audit`) configuration.
 [advisories]
-# zip 4.6.1 extraction flaws (symlink targets, SUID bits, permissions through symlinks). The only
-# dependent is tauri-plugin-updater, which declares zip as `cfg(target_os = "windows")` and
-# optional, and every release up to 2.14.0 still pins zip ^4. SHOGUN ships macOS/arm64 only, so
-# zip is never compiled into the app. Drop these once the updater moves to zip >= 9.
-#
-# webpki-roots distrusted emSign root (RUSTSEC-2026-0381). Cargo.lock pins the patched
-# webpki-roots 1.0.10. The advisory also matches webpki-roots 0.26.11, which tungstenite 0.24 still
-# pulls in, but 0.26.11 is a shim with no roots of its own: its only dependency is webpki-roots
-# 1.0.10, whose roots it re-exports. Drop this once tungstenite moves to webpki-roots 1.x.
-ignore = ["RUSTSEC-2026-0367", "RUSTSEC-2026-0368", "RUSTSEC-2026-0369", "RUSTSEC-2026-0381"]
+ignore = []
